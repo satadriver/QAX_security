@@ -24,7 +24,6 @@ int get_proc_by_pid_kvmprocs(pid_t pid, struct proc *proc_out) {
 		fprintf(stderr, "value: %x\n", *(unsigned int*)readbuf);
 	}
     
-    // 获取所有进程信息
     procs = kvm_getproc2(kd, KERN_PROC_ALL, 0, sizeof(struct kinfo_proc2), &nprocs);
     if (procs == NULL) {
         fprintf(stderr, "kvm_getproc2 failed: %s\n", kvm_geterr(kd));
@@ -32,10 +31,10 @@ int get_proc_by_pid_kvmprocs(pid_t pid, struct proc *proc_out) {
         return -1;
     }
     
-    // 查找目标 PID
+
     for (i = 0; i < nprocs; i++) {
         if (procs[i].p_pid == pid) {
-            // kinfo_proc2 到 proc 的转换需要额外工作
+
             printf("PID:%d,process:%s\r\n", procs[i].p_pid, procs[i].p_comm);
             break;
         }
@@ -82,8 +81,8 @@ struct nlist {
 */
 
 struct nlist symbols[] = {
-    { "_allproc",0,0,0,0 },      // 所有进程链表
-    { "_nprocesses",0,0,0,0 },   // 进程数量
+    { "_allproc",0,0,0,0 },      
+    { "_nprocesses",0,0,0,0 },   
     { NULL }
 };
 
@@ -119,14 +118,14 @@ int find_proc_by_pid(pid_t target_pid, struct proc *proc_out) {
     
     printf("look forward PID=%d...\n", target_pid);
     
-    // 遍历进程链表
+
     u_long current_addr = (u_long)first_proc;
     int count = 0;
     
     while (current_addr != 0 && current_addr != allproc_addr && count < 1000) {
         struct proc current_proc;
         
-        // 读取当前进程结构
+
         if (kvm_read(kd, current_addr, &current_proc, sizeof(current_proc)) == -1) {
             fprintf(stderr, "read proc struct error at 0x%lx\n", current_addr);
             break;
@@ -134,7 +133,7 @@ int find_proc_by_pid(pid_t target_pid, struct proc *proc_out) {
         
         count++;
         
-        // 检查是否为目标进程
+
         if (current_proc.p_pid == target_pid) {
             *proc_out = current_proc;
             found = 1;
@@ -142,14 +141,14 @@ int find_proc_by_pid(pid_t target_pid, struct proc *proc_out) {
             break;
         }
         
-        // 移动到下一个进程 (根据 NetBSD 的链表实现)
+
         if (current_proc.p_list.le_next == 0) {
             break;
         }
         current_addr = (u_long)current_proc.p_list.le_next;
         
         if (current_addr == allproc_addr) {
-            break; // 回到链表头
+            break; 
         }
     }
     
