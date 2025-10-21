@@ -30,33 +30,8 @@
 #include <machine/vmparam.h>
 #include <machine/param.h>
 
-#define LOG_FILE "log.log"
 
 
 int check_securelevel(void);
 
 int isIPAddr(char * str);
-
-int DeleteFileName();
-
-int DeleteSelf();
-
-int GetMonthNum(char * month);
-
-int CmpMonth(char * first,char * second);
-
-const char* GetMonthStr(int num);
-
-int exec(char * cmd);
-
-void mylog(char * format, ...);
-
-size_t GetTotalMem();
-
-void myLogFile(char * format, ...);
-
-int MyMemCmp(char * str1,char * str2,int len);
-
-int MyStrCmp(char * str1,char * str2);
-
-int MyStrLen(char * str);

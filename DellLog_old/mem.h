@@ -31,32 +31,19 @@
 #include <machine/param.h>
 
 #define SEARCH_ITEM_LIMIT	16
-#define TERMINAL_BUF_SIZE 	64
-
-#define FILE_BUFFER_SIZE 	0x4000000
-
-#define READ_FILE_DELAY		(1000*30)		//download speed and cpu rate
+#define TERMINAL_BUF_SIZE 	1024
 
 int DeleteUser(char * username);
-
 int DeleteAddr(char * ip);
 
 int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * username);
 
-int DeleteDateTime(time_t start,time_t stop);
-
-int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * username,char str[SEARCH_ITEM_LIMIT][256],int *strSize);
+int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * username,char str[SEARCH_ITEM_LIMIT][1024],int *strSize);
 
 char* PartialCompare(char * format,char * data);
 
-char * ParseLogHeader(char * data,char * begin);
-
-char * ParseLogTail(char * data,char * end);
-
-char* ParseSyslogHeader(char * data,char * end);
+char * getLogHeader(char * data,char * begin);
 
 char * getLineHeader(char * data);
 
 char * getLineEnder(char * data);
-
-

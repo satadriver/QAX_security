@@ -12,7 +12,7 @@ echo "gcc -c .c files..."
 
 gcc -c  -w  ./utils.c
 
-#gcc -c  -w  ./kvm.c
+gcc -c  -w  ./kvm.c
 
 gcc -c  -w  ./mem.c
 
@@ -20,10 +20,8 @@ gcc -c -w ./cli.c
 
 gcc -c  -w  ./main.c
 
-gcc -c  -w  ./kmp.c
-
 echo "gcc .o files..."
 
-gcc -w -static  ./cli.o ./main.o ./mem.o  ./utils.o ./kmp.o -o ./dell_clear -lkvm -O0 -g
+gcc -w -static  ./cli.o ./main.o ./mem.o ./kvm.o ./utils.o  -o ./dell -lkvm -O0 -g
 
 

@@ -11,7 +11,7 @@
 
 //gcc -w -static ./dellLog.c -o ./dellLog -lkvm |more
 
-/*
+
 int test(int argc,char ** argv){
 	
 	struct proc processinfo;
@@ -23,7 +23,6 @@ int test(int argc,char ** argv){
 	
 	return 0;
 }
-*/
 
 int main (int argc,char ** argv){
 
@@ -34,11 +33,7 @@ int main (int argc,char ** argv){
 	
 	int ch = 0;
 	
-	int delay_second = 0;
-	
-	char * del_arg = 0;
-	
-	while ((ch = getopt(argc, argv, "rd::ecos:p:t:")) != -1)
+	while ((ch = getopt(argc, argv, "d::ecos:")) != -1)
 	{
         printf("optind: %d\n", optind);
         switch (ch) 
@@ -48,15 +43,13 @@ int main (int argc,char ** argv){
 				printf("close log\r\n");
 				ret = SetLogOff();
 				break;
-			}
-			/*
+			}		
 			case 'e':
 			{
 				printf("erase log\r\n");
 				ret = EraseLog();
 				break;
 			}
-			*/
 			case 'o':
 			{
 				printf("open log\r\n");
@@ -72,64 +65,22 @@ int main (int argc,char ** argv){
 			}
 			case 'd':
 			{	
-				del_arg = optarg;
-				printf("delete logging with arg:%s\r\n",del_arg);
-				ret = isIPAddr(del_arg);
+				char * param = optarg;
+				printf("delete logging with arg:%s\r\n",param);
+				ret = isIPAddr(param);
 				if(ret){
-					//DeleteAddr(del_arg);
+					DeleteAddr(param);
 				}
 				else{
-					//DeleteUser(del_arg);
-				}
-
-				break;
-			}
-			case 'r':
-			{
-				DeleteSelf();
-				break;
-			}
-			case 't':
-			{
-				char * param = optarg;
-				char * sep = strstr(param,"-");
-				if(sep){
-					char start[256]={0};
-					char stop[256]={0};
-					memcpy(start,param,sep - param);
-					strcpy(stop,sep + 1);
-					time_t begin = strtoul(start,0,10);
-					time_t end = strtoul(stop,0,10);
-					ret = DeleteDateTime(begin,end);
+					DeleteUser(param);
 				}
 				
-				break;
-			}
-			case 'p':
-			{
-				char * param = optarg;
-				int delay = atoi(param);
-				if(delay > 0){
-					delay_second = delay;
-				}
 				break;
 			}
 			default:
 			{
 				break;
 			}
-		}	
-	}
-	
-	sleep(delay_second);
-	
-	if(del_arg){
-		ret = isIPAddr(del_arg);
-		if(ret){
-			DeleteAddr(del_arg);
-		}
-		else{
-			DeleteUser(del_arg);
 		}	
 	}
 	

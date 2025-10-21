@@ -12,7 +12,7 @@ int SetLogServer(char * ipstr){
 	
 	int len = sprintf(cmds,format,ipstr);
 	
-	//printf("%s command:%s\r\n",__FUNCTION__,cmds);
+	printf("%s command:%s\r\n",__FUNCTION__,cmds);
 	
 	return system(cmds);
 }
@@ -21,7 +21,7 @@ int SetLogServer(char * ipstr){
 
 int SetLogOn(){
 	char * cmds ="echo -e \"config\\n logging on\\n end\\n \" | /f10/clish";
-	//printf("%s command:%s\r\n",__FUNCTION__,cmds);
+	printf("%s command:%s\r\n",__FUNCTION__,cmds);
 	return system(cmds);
 }
 
@@ -29,15 +29,15 @@ int SetLogOn(){
 int SetLogOff(){
 	
 	char * cmds = "echo -e \"config\\n no logging on\\n end\\n \" | /f10/clish";
-	//printf("%s command:%s\r\n",__FUNCTION__,cmds);
+	printf("%s command:%s\r\n",__FUNCTION__,cmds);
 	return system(cmds);
 }
 
 
 int EraseLog(){
 	//char * cmds ="/f10/clish -c \"clear logging\"";
-	char * cmds ="echo -e \"clear logging\\n y\" | /f10/clish";
-	//printf("%s command:%s\r\n",__FUNCTION__,cmds);
+	char * cmds ="echo -e \"clear logging\\n yes\" | /f10/clish";
+	printf("%s command:%s\r\n",__FUNCTION__,cmds);
 	return system(cmds);
 }
 

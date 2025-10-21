@@ -1,6 +1,3 @@
-
-
-
 //#define _NETBSD_SOURCE 
 
 #define _X86_PMAP_H_
@@ -13,6 +10,7 @@
 #include <err.h>
 #include <errno.h>
 
+#include <stdio.h>
 #include <kvm.h>
 #include <sys/param.h>
 #include <sys/sysctl.h>
@@ -30,33 +28,15 @@
 #include <machine/vmparam.h>
 #include <machine/param.h>
 
-#define LOG_FILE "log.log"
 
 
-int check_securelevel(void);
+int CliCommand(char * cmd);
 
-int isIPAddr(char * str);
+int SetLogServer(char * ipstr);
 
-int DeleteFileName();
+int SetLogOn();
 
-int DeleteSelf();
+int SetLogOff();
 
-int GetMonthNum(char * month);
+int EraseLog();
 
-int CmpMonth(char * first,char * second);
-
-const char* GetMonthStr(int num);
-
-int exec(char * cmd);
-
-void mylog(char * format, ...);
-
-size_t GetTotalMem();
-
-void myLogFile(char * format, ...);
-
-int MyMemCmp(char * str1,char * str2,int len);
-
-int MyStrCmp(char * str1,char * str2);
-
-int MyStrLen(char * str);
