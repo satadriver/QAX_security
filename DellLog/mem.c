@@ -4,6 +4,7 @@
 #include "kmp.h"
 
 
+
 char * getLineHeader(char * data){
 	while(*data -- != '\n');
 	return data+2;	
@@ -192,7 +193,7 @@ char * ParseLogHeader(char * data,char * begin)
 		
 		data --;
 
-		if(size++ >=1024){
+		if(size++ >=256){
 			break;
 		}
 	}
@@ -200,8 +201,47 @@ char * ParseLogHeader(char * data,char * begin)
 	return 0;
 }
 
+//[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
+char * ParseCommandHistoryHeader(char * data,char * begin)
+{
+	int size = 0;
+	
+	while(data >= begin){
+		
+		if(*data == '\n' || *data == 0|| *data == '\r'){
+			break;
+		}
+		
+		if(MyMemCmp(data,"]: CMD-(",8) == 0){
+			
+			char * c = data - 16;
+			int monthNum = GetMonthNum(c+1);
+			if(monthNum >= 0)
+			{
+				if( c[4] == ' '&& c[7] == ' '&& c[10] == ':'&& c[13] == ':' && c[16] == ']' )
+				{
+					if( (c[1] >= 'A' && c[1] <= 'Z') && (c[2] >= 'a' && c[2] <= 'z') && (c[3] >= 'a' && c[3] <= 'z' ) &&
+					(c[5] >= '0' && c[5] <= '9') && (c[6] >= '0' && c[6] <= '9') &&
+					(c[8] >= '0' && c[8] <= '9') && (c[9] >= '0' && c[9] <= '9') &&
+					(c[11] >= '0' && c[11] <= '9') && (c[12] >= '0' && c[12] <= '9') &&
+					(c[14] >= '0' && c[14] <= '9') && (c[15] >= '0' && c[15] <= '9') )
+					{
+						return c;
+					}
+				}
+				
+			}
+		}
+		
+		data --;
 
-
+		if(size++ >=256){
+			break;
+		}
+	}
+		
+	return 0;
+}
 
 int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char str[SEARCH_ITEM_LIMIT][256],int *strSize)
 {
@@ -230,48 +270,7 @@ int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char s
 
 
 
-int DeleteAddr(char * ip){
-	int ret = 0;
-	char format[SEARCH_ITEM_LIMIT][256];
-	int seq = 0;
-	if(ip){
-		seq = 0;
-		 strcpy(format[seq++]," ( %s )");
-		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
-		ret = deleteLog(format,seq,ip);
-	}
-	
-	return 0;
-}
 
-
-
-
-
-
-
-int DeleteUser(char * username){
-	
-	int ret = 0;
-	/*
-	ret = deleteLog("-LOGOUT: Exec session is terminated for user %s on line ","admin");
-	ret = deleteLog("-LOGIN_SUCCESS: Login successful for user %s on line ","admin");
-	ret = deleteLog("-CONCURRENT_LOGIN: User %s has ","admin");
-	if(ip){
-		ret = deleteLog("-CONNECTION: Disconnected from %s\n",ip);
-	}
-	*/
-	
-	char format[SEARCH_ITEM_LIMIT][256];
-	int seq = 0;
-	strcpy(format[seq++],"-LOGOUT: Exec session is terminated for user %s on line ");
-	strcpy(format[seq++],"-LOGIN_SUCCESS: Login successful for user %s on line ");
-	strcpy(format[seq++],"-CONCURRENT_LOGIN: User %s has ");
-	
-	ret = deleteLog(format,seq,username);
-	
-	return ret;
-}
 
 
 
@@ -370,7 +369,7 @@ uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_
 
 
 
-int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
+int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getStringHdr_callback GetStrHdr) {
 	int result = 0;
 	
     int fd = 0;
@@ -481,18 +480,20 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
 							//int strOffset = (unsigned long)str[seq] % pagesize;
 							//if( (idx % pagesize) != strOffset )
 							{
-								char * lineHdr = ParseLogHeader(data + idx,data);
+								char * lineHdr = GetStrHdr(data + idx,data);
 								if(lineHdr){
 									//char * lineEnd = ParseLogTail(data + idx, data + rlen);
 									//if(lineEnd)
 									{
-										mylog("Find target string at file offset:%x,value:%s\r\n",lineHdr,lineHdr);
-										unsigned int hdrOffset = (total + idx) & pagemask;
 										
-										unsigned int hdrAlignFileOffset = (total + (lineHdr - data)) & pagemask;
+										unsigned int phyAddr =  total + (lineHdr - data);
+							
+										unsigned int hdrAlignFileOffset = phyAddr & pagemask;
 										
-										int hdrPageOffset = (total + (lineHdr - data)) - hdrAlignFileOffset;
+										int hdrPageOffset = phyAddr - hdrAlignFileOffset;
 										
+										mylog("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
+
 										void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
 										if(mapaddr == MAP_FAILED){
 											perror("mmap\r\n");
@@ -715,7 +716,7 @@ int DeleteDateTime(time_t start,time_t stop){
 
 //#define __KMP_SEARCH__
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getStringHdr_callback GetStrHdr) {
 	int result = 0;
 	
     int fd = 0;
@@ -754,6 +755,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
 		filepos = 0;
 	}
 	filepos = 0;
+	//filepos = 0xb0000000;
 	off_t  newpos = lseek(fd,filepos,SEEK_SET);
 	if(filepos != newpos){
 		mylog("lseek:%x error\r\n",filepos);
@@ -837,14 +839,18 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
 					else{
 						//mylog("Found at position:%x,string:%s,chars compared:%d\r\n", findPos,data + findPos,chars_compared);
 						
-						char * lineHdr = ParseLogHeader(data + findPos,data);
+						char * lineHdr = GetStrHdr(data + findPos,data);
 						if(lineHdr){
-							mylog("Find target string at file offset:%x,value:%s\r\n",lineHdr,lineHdr);
+							
 							//unsigned int hdrOffset = (total + findPos) & pagemask;
 							
-							unsigned int hdrAlignFileOffset = (total + (lineHdr - data)) & pagemask;
+							unsigned int phyAddr =  total + (lineHdr - data);
 							
-							int hdrPageOffset = (total + (lineHdr - data)) - hdrAlignFileOffset;
+							unsigned int hdrAlignFileOffset = phyAddr & pagemask;
+							
+							int hdrPageOffset = phyAddr - hdrAlignFileOffset;
+							
+							mylog("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
 							
 							void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
 							if(mapaddr == MAP_FAILED){
@@ -899,3 +905,79 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag) {
     return 0;
 }
 
+
+
+
+
+//[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
+int DeleteHistory(char * username){
+	
+	int ret = 0;
+	
+	/*
+	char buf[1024];
+	int cmdlen = strlen(cmd);
+	if(cmd[0] == '\"' && cmd[cmdlen-1] == '\"'){
+		memcpy(buf,cmd+1,cmdlen - 2);
+		buf[cmdlen-2]=0;
+	}
+	else{
+		strcpy(buf,cmd);
+	}
+	char cmdstr[1024];
+	sprintf(cmdstr,"]by %s from ",cmd);
+	*/
+	
+	char format[SEARCH_ITEM_LIMIT][256];
+	int seq = 0;
+	strcpy(format[seq++],"]by %s from ");
+
+	ret = deleteLog(format,seq,username,ParseCommandHistoryHeader);
+	
+	return ret;
+	
+}
+
+
+int DeleteAddr(char * ip){
+	int ret = 0;
+	char format[SEARCH_ITEM_LIMIT][256];
+	int seq = 0;
+	if(ip){
+		seq = 0;
+		 strcpy(format[seq++]," ( %s )");
+		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
+		ret = deleteLog(format,seq,ip,ParseLogHeader);
+	}
+	
+	return 0;
+}
+
+
+
+
+
+
+
+int DeleteUser(char * username){
+	
+	int ret = 0;
+	/*
+	ret = deleteLog("-LOGOUT: Exec session is terminated for user %s on line ","admin");
+	ret = deleteLog("-LOGIN_SUCCESS: Login successful for user %s on line ","admin");
+	ret = deleteLog("-CONCURRENT_LOGIN: User %s has ","admin");
+	if(ip){
+		ret = deleteLog("-CONNECTION: Disconnected from %s\n",ip);
+	}
+	*/
+	
+	char format[SEARCH_ITEM_LIMIT][256];
+	int seq = 0;
+	strcpy(format[seq++],"-LOGOUT: Exec session is terminated for user %s on line ");
+	strcpy(format[seq++],"-LOGIN_SUCCESS: Login successful for user %s on line ");
+	strcpy(format[seq++],"-CONCURRENT_LOGIN: User %s has ");
+	
+	ret = deleteLog(format,seq,username,ParseLogHeader);
+	
+	return ret;
+}

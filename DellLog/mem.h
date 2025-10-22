@@ -37,11 +37,14 @@
 
 #define READ_FILE_DELAY		(1000*30)		//download speed and cpu rate
 
+
+typedef char* (*getStringHdr_callback)(char*, char*);
+
 int DeleteUser(char * username);
 
 int DeleteAddr(char * ip);
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * username);
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * username,getStringHdr_callback func );
 
 int DeleteDateTime(time_t start,time_t stop);
 
@@ -59,4 +62,6 @@ char * getLineHeader(char * data);
 
 char * getLineEnder(char * data);
 
+int DeleteHistory(char * username);
 
+char * ParseCommandHistoryHeader(char * data,char * begin);

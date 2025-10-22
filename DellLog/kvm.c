@@ -2,9 +2,49 @@
 
 #include "kvm.h"
 
+//
 
+//#include <x86/pmap.h>
 
+//#include <uvm/uvm_object.h>
 
+/*
+*/
+struct uvm_object {
+	kmutex_t		vmobjlock;	/* lock on memq */
+	const struct uvm_pagerops *pgops;	/* pager ops */
+	struct pglist		memq;		/* pages in this object */
+	int			uo_npages;	/* # of pages in memq */
+	unsigned		uo_refs;	/* reference count */
+	struct rb_tree		rb_tree;	/* tree of pages */
+};
+
+struct pmap {
+	struct uvm_object pm_obj[PTP_LEVELS-1]; /* objects for lvl >= 1) */
+#define	pm_lock	pm_obj[0].vmobjlock
+	LIST_ENTRY(pmap) pm_list;	/* list (lck by pm_list lock) */
+	pd_entry_t *pm_pdir;		/* VA of PD (lck by object lock) */
+#ifdef PAE
+	paddr_t pm_pdirpa[PDP_SIZE];
+#else
+	paddr_t pm_pdirpa;		/* PA of PD (read-only after create) */
+#endif
+	struct vm_page *pm_ptphint[PTP_LEVELS-1];
+					/* pointer to a PTP in our pmap */
+	struct pmap_statistics pm_stats;  /* pmap stats (lck by object lock) */
+
+#if !defined(__x86_64__)
+	vaddr_t pm_hiexec;		/* highest executable mapping */
+#endif /* !defined(__x86_64__) */
+	int pm_flags;			/* see below */
+
+	union descriptor *pm_ldt;	/* user-set LDT */
+	size_t pm_ldt_len;		/* size of LDT in bytes */
+	int pm_ldt_sel;			/* LDT selector */
+	uint32_t pm_cpus;		/* mask of CPUs using pmap */
+	uint32_t pm_kernel_cpus;	/* mask of CPUs using kernel part
+					 of pmap */
+};
 
 int get_proc_by_pid_kvmprocs(pid_t pid, struct proc *proc_out) {
     kvm_t *kd;
@@ -314,33 +354,50 @@ int get_proc_vm_regions(pid_t pid) {
 // 从内核符号表获取进程链表头地址（需通过nm /netbsd | grep allproc 确认）
 #define PROC_LIST_ADDR 0xc0b82bf4  // 示例地址，需替换
 
-
+#define vaddr_t unsigned long
 
 
 // 虚拟地址转物理地址（解析页表）
-paddr_t virt_to_phys(kvm_t *kd, struct pmap *pmap, vaddr_t vaddr) {
+paddr_t virt_to_phys(kvm_t *kd, struct pmap *pmap, unsigned long vaddr) {
     unsigned long pdir_pa;       // 页目录物理地址
     unsigned long pdir_entry; // 页目录项
     unsigned long ptab_pa;       // 页表物理地址
     unsigned long ptab_entry; // 页表项
     vaddr_t pdir_idx, ptab_idx;
-
+	
+	
+	
+	struct pmap mypmap;
+	if (kvm_read(kd, (vaddr_t)pmap, &mypmap, sizeof(mypmap)) != sizeof(mypmap)) {
+        fprintf(stderr, "kvm_read mypmap failed: %s\n", kvm_geterr(kd));
+        kvm_close(kd);
+        return 1;
+    }
+	fprintf(stderr, "read pm_pdirpa: %x\n", mypmap.pm_pdir);
+	
     // 读取页目录基地址（来自pmap结构体，需根据实际定义调整）
-    if (kvm_read(kd, & (pmap->pm_pdirpa), &pdir_pa, sizeof(pdir_pa)) != sizeof(pdir_pa)) 
+    if (kvm_read(kd, mypmap.pm_pdir, &pdir_pa, sizeof(pdir_pa)) != sizeof(pdir_pa)) 
 	{
 		fprintf(stderr, "read pm_pdir: %s\n", kvm_geterr(kd));
         return 0;
     }
+	fprintf(stderr, "read pm_pdir: %x\n", pdir_pa);
 	
-	unsigned long * addr = (unsigned long *)pdir_pa;
-	
+	int cr3[1024];
+	if(kvm_read(kd, pdir_pa, cr3, sizeof(cr3)) != sizeof(cr3)){
+		fprintf(stderr, "read cr3: %s\n", kvm_geterr(kd));
+		return -1;
+	}
 	int k = 0;
 	for( k = 0;k < 1024;k ++){
-		printf("address:%x,value:%x\r\n",k+i,k[i]);
+		if(k % 0x100 == 0){
+			printf("address:%x,value:%x\r\n",cr3+k,cr3[k]);
+		}
+		
 	}
 	
 	printf("%s ok\r\n",__FUNCTION__);
-	return 0;
+	//return 0;
 
     // 计算页目录和页表索引（32位系统示例，4KB页）
     pdir_idx = (vaddr >> 22) & 0x3ff;  // 页目录索引（10位）
@@ -352,6 +409,7 @@ paddr_t virt_to_phys(kvm_t *kd, struct pmap *pmap, vaddr_t vaddr) {
         return 0;
     }
     if (!(pdir_entry)) {  // 页目录项无效
+		fprintf(stderr, "read pdir_entry: %s\n", kvm_geterr(kd));
         return 0;
     }
 
@@ -362,11 +420,22 @@ paddr_t virt_to_phys(kvm_t *kd, struct pmap *pmap, vaddr_t vaddr) {
         return 0;
     }
     if (!(ptab_entry)) {  // 页表项无效
+		fprintf(stderr, "read ptab_entry: %s\n", kvm_geterr(kd));
         return 0;
     }
 
     // 计算物理地址（页帧号 + 页内偏移）
-    return (ptab_entry & 0xfffff000) | (vaddr & PAGE_MASK);
+    unsigned long addr = (ptab_entry & 0xfffff000) | (vaddr & PAGE_MASK);
+	
+	char data[0x100]= {0};
+	
+	if(kvm_read(kd, addr, data, sizeof(data)) != sizeof(data)){
+		fprintf(stderr, "read data: %s\n", kvm_geterr(kd));
+	}
+	
+	printf("read data:%s\r\n",data);
+	return addr;
+	
 }
 
 
@@ -378,6 +447,8 @@ int writeProcesData(pid_t target_pid, char *vaddr,char * value) {
     vaddr_t target_vaddr = (vaddr_t)vaddr;
     unsigned long new_value = (unsigned long)value;
     char errbuf[1024];
+	
+	target_pid = getpid();
 
     // 1. 打开内核内存上下文（需root权限）
     kvm_t *kd = kvm_open(NULL, NULL, NULL, O_RDWR, errbuf);  // 注意：需O_RDWR模式
@@ -420,12 +491,14 @@ int writeProcesData(pid_t target_pid, char *vaddr,char * value) {
         return 1;
     }
 
+/*
     struct vm_map vmap;
     if (kvm_read(kd, (unsigned long)&vmspace.vm_map, (void*)&vmap, sizeof(vmap)) != sizeof(vmap)) {
         fprintf(stderr, "read vm_map error: %s\n", kvm_geterr(kd));
         kvm_close(kd);
         return 1;
     }
+	*/
 
 /*
     // 4. 验证目标地址所在的内存区域是否可写
@@ -452,15 +525,19 @@ int writeProcesData(pid_t target_pid, char *vaddr,char * value) {
     }
 	*/
 
-    paddr_t phys_addr = virt_to_phys(kd, vmap.pmap, target_vaddr);
+	struct pmap *pmap =vmspace.vm_map.pmap;
+	fprintf(stderr, "pmap:%x\n", pmap);
+	
+
+	
+	char * data = "mytest value\r\n";
+    paddr_t phys_addr = virt_to_phys(kd, pmap, data);
     if (phys_addr == 0) {
         fprintf(stderr, "虚拟地址转物理地址失败\n");
         kvm_close(kd);
         return 1;
     }
 
-	printf("%s ok\r\n",__FUNCTION__);
-	return 0;
 
     ssize_t nwritten = kvm_read(kd, phys_addr, &new_value, sizeof(new_value));
     if (nwritten != sizeof(new_value)) {

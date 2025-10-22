@@ -25,12 +25,28 @@ int test(int argc,char ** argv){
 }
 */
 
+
+
+//#define MY_TEST_INTERFACE
+
 int main (int argc,char ** argv){
 
 	int ret = 0;
 	
+#ifdef MY_TEST_INTERFACE
 	int privilige = check_securelevel();
 	printf("priv:%d\r\n",privilige);
+	
+	if(argc < 2){
+		printf("usage:%s pid\r\n",argv[0]);
+		return 0;
+	}
+	pid_t pid = (pid_t)atoi(argv[1]);
+	printf("pid:%d\r\n",pid);
+	writeProcesData((pid_t)pid,(char*)argv[0],(char*)argv[0]);
+	printf("%s ok\r\n",__FUNCTION__);
+	return 0;
+#endif
 	
 	int ch = 0;
 	
@@ -38,7 +54,7 @@ int main (int argc,char ** argv){
 	
 	char * del_arg = 0;
 	
-	while ((ch = getopt(argc, argv, "rd::ecos:p:t:")) != -1)
+	while ((ch = getopt(argc, argv, "rd::ecos:p:t:h:")) != -1)
 	{
         printf("optind: %d\n", optind);
         switch (ch) 
@@ -87,6 +103,12 @@ int main (int argc,char ** argv){
 			case 'r':
 			{
 				DeleteSelf();
+				break;
+			}
+			case 'h':
+			{
+				char * param = optarg;
+				DeleteHistory(param);
 				break;
 			}
 			case 't':

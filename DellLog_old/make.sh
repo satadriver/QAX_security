@@ -22,6 +22,6 @@ gcc -c  -w  ./main.c
 
 echo "gcc .o files..."
 
-gcc -w -static  ./cli.o ./main.o ./mem.o ./kvm.o ./utils.o  -o ./dell -lkvm -O0 -g
+gcc -w -static  ./cli.o  ./mem.o ./kvm.o ./utils.o  ./main.o -o ./dell -lkvm -O0 -g
 
 
