@@ -4,6 +4,96 @@
 #include "kmp.h"
 
 
+#define ALPHABET_LEN 256
+#define NOT_FOUND patlen
+#define max(a, b) ((a < b) ? b : a)
+
+int chars_compared;
+
+
+
+void make_delta1(int *delta1, uint8_t *pat, int32_t patlen) {
+    int i;
+    for (i=0; i < ALPHABET_LEN; i++) {
+        delta1[i] = NOT_FOUND;
+    }
+    for (i=0; i < patlen-1; i++) {
+        delta1[pat[i]] = patlen-1 - i;
+    }
+}
+
+int is_prefix(uint8_t *word, int wordlen, int pos) {
+    int i;
+    int suffixlen = wordlen - pos;
+
+    for (i=0; i < suffixlen; i++) {
+        if (word[i] != word[pos+i]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int suffix_length(uint8_t *word, int wordlen, int pos) {
+    int i;
+    // increment suffix length i to the first mismatch or beginning
+    // of the word
+    for (i = 0; (word[pos-i] == word[wordlen-1-i]) && (i < pos); i++);
+    return i;
+}
+
+
+void make_delta2(int *delta2, uint8_t *pat, int32_t patlen) {
+    int p;
+    int last_prefix_index = 1;
+
+    // first loop, prefix pattern
+    for (p=patlen-1; p>=0; p--) {
+        if (is_prefix(pat, patlen, p+1)) {
+            last_prefix_index = p+1;
+        }
+        delta2[p] = (patlen-1 - p) + last_prefix_index;
+    }
+
+    // this is overly cautious, but will not produce anything wrong
+    // second loop, suffix pattern
+    for (p=0; p < patlen-1; p++) {
+        int slen = suffix_length(pat, patlen, p);
+        if (pat[p - slen] != pat[patlen-1 - slen]) {
+            delta2[patlen-1 - slen] = patlen-1 - p + slen;
+        }
+    }
+}
+
+
+uint32_t boyer_moore (uint8_t *data, uint32_t size, uint8_t *pat, uint32_t patlen,int * delta1,int * delta2) {
+
+    //int delta1[ALPHABET_LEN];
+    //int *delta2 = malloc(patlen * sizeof(int));
+    //make_delta1(delta1, pat, patlen);
+    //make_delta2(delta2, pat, patlen);
+
+    chars_compared = 0;
+
+    int i = patlen-1;
+    while (i < size) {
+        int j = patlen-1;
+        while (j >= 0 && (data[i] == pat[j])) {
+            --i;
+            --j;
+            chars_compared++;
+        }
+        if (j < 0) {
+            //free(delta2);
+            return (uint32_t) i+1;
+        }
+        chars_compared++;
+        i += max(delta1[data[i]], delta2[j]);
+    }
+    //free(delta2);
+    return 0;
+}
+
 
 char * getLineHeader(char * data){
 	while(*data -- != '\n');
@@ -275,96 +365,9 @@ int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char s
 
 
 
-#include <stdint.h>
-#include <stdbool.h>
 
 
-#define ALPHABET_LEN 256
-#define NOT_FOUND patlen
-#define max(a, b) ((a < b) ? b : a)
 
-int chars_compared;
-
-void make_delta1(int *delta1, uint8_t *pat, int32_t patlen) {
-    int i;
-    for (i=0; i < ALPHABET_LEN; i++) {
-        delta1[i] = NOT_FOUND;
-    }
-    for (i=0; i < patlen-1; i++) {
-        delta1[pat[i]] = patlen-1 - i;
-    }
-}
-
-int is_prefix(uint8_t *word, int wordlen, int pos) {
-    int i;
-    int suffixlen = wordlen - pos;
-
-    for (i=0; i < suffixlen; i++) {
-        if (word[i] != word[pos+i]) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-int suffix_length(uint8_t *word, int wordlen, int pos) {
-    int i;
-    // increment suffix length i to the first mismatch or beginning
-    // of the word
-    for (i = 0; (word[pos-i] == word[wordlen-1-i]) && (i < pos); i++);
-    return i;
-}
-
-
-void make_delta2(int *delta2, uint8_t *pat, int32_t patlen) {
-    int p;
-    int last_prefix_index = 1;
-
-    // first loop, prefix pattern
-    for (p=patlen-1; p>=0; p--) {
-        if (is_prefix(pat, patlen, p+1)) {
-            last_prefix_index = p+1;
-        }
-        delta2[p] = (patlen-1 - p) + last_prefix_index;
-    }
-
-    // this is overly cautious, but will not produce anything wrong
-    // second loop, suffix pattern
-    for (p=0; p < patlen-1; p++) {
-        int slen = suffix_length(pat, patlen, p);
-        if (pat[p - slen] != pat[patlen-1 - slen]) {
-            delta2[patlen-1 - slen] = patlen-1 - p + slen;
-        }
-    }
-}
-
-uint32_t boyer_moore (uint8_t *string, uint32_t stringlen, uint8_t *pat, uint32_t patlen) {
-    int i;
-    int delta1[ALPHABET_LEN];
-    int *delta2 = malloc(patlen * sizeof(int));
-    make_delta1(delta1, pat, patlen);
-    make_delta2(delta2, pat, patlen);
-    int n_shifts = 0;
-    chars_compared = 0;
-
-    i = patlen-1;
-    while (i < stringlen) {
-        int j = patlen-1;
-        while (j >= 0 && (string[i] == pat[j])) {
-            --i;
-            --j;
-            chars_compared++;
-        }
-        if (j < 0) {
-            free(delta2);
-            return (uint32_t) i+1;
-        }
-        chars_compared++;
-        i += max(delta1[string[i]], delta2[j]);
-    }
-    free(delta2);
-    return 0;
-}
 
 
 
@@ -397,6 +400,10 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
     }
 	
 	size_t memTotal = GetTotalMem();
+	if(memTotal >= 0xc0000000)
+	{
+		memTotal = 0xc0000000;
+	}
 	
 	if(memTotal < bufSize){
 		perror("memory size too small\r\n");
@@ -492,7 +499,7 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 										
 										int hdrPageOffset = phyAddr - hdrAlignFileOffset;
 										
-										mylog("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
+										mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
 
 										void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
 										if(mapaddr == MAP_FAILED){
@@ -506,6 +513,8 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 										
 										num ++;
 										munmap(mapaddr, pagesize);
+										
+										mylog_new("find target:%8d    ",num);
 									}
 									//else{
 									//	mylog("Not Find target string end at file offset:%x,value:%s\r\n",lineHdr,lineHdr);
@@ -558,8 +567,168 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 	time_t endTime = time(0);
 	mylog("%s completed with clearing %d log records,time cost:%d seconds\r\n",__FUNCTION__,num,endTime - startTime);
 	
-    return 0;
+    return num;
 }
+
+
+int DeleteDateTime_old(time_t start,time_t stop){
+	
+	time_t startTime = time(0);
+	struct tm * tm_start = localtime(&startTime);
+	if(tm_start){
+		mylog("%s start date time:%04d/%02d/%02d %02d:%02d:%02d\r\n",__FUNCTION__,
+		tm_start->tm_year+1900,tm_start->tm_mon+1,tm_start->tm_mday,tm_start->tm_hour,tm_start->tm_min,tm_start->tm_sec);
+	}
+	
+	if(stop == -1 ){
+		stop = time(0);
+	}
+	
+	start = time(0) - start ;
+	stop = time(0) - stop ;
+	
+	if(start == 0 || start >= stop){
+		return 0;
+	}
+	
+	mylog("start:%d,end:%d\r\n",start,stop);
+	
+	char startstr[256];
+	struct tm * tm_begin = localtime(&start);		//static variable
+	const char * startmon = GetMonthStr(tm_begin->tm_mon);
+	int startlen = sprintf(startstr,"%s %02d %02d:%02d:%02d",
+	startmon,tm_begin->tm_mday,tm_begin->tm_hour,tm_begin->tm_min,tm_begin->tm_sec);
+	
+	struct tm * tm_end = localtime(&stop);
+	char endstr[256];
+	const char * endmon = GetMonthStr(tm_end->tm_mon);
+	int endlen = sprintf(endstr,"%s %02d %02d:%02d:%02d",
+	endmon,tm_end->tm_mday,tm_end->tm_hour,tm_end->tm_min,tm_end->tm_sec);
+	
+	mylog("start:%s,end:%s\r\n",startstr,endstr);
+	
+	int result = 0;
+	
+	int ret = 0;
+	
+    int fd = 0;
+	
+	unsigned long bufSize = FILE_BUFFER_SIZE;
+
+    char *data=malloc(bufSize+TERMINAL_BUF_SIZE);
+	if(data <= 0){
+		perror("malloc");
+		return -1;
+	}
+    
+    fd = open("/dev/mem", O_RDWR);
+    if (fd <= 0) {
+        perror("open");
+		free(data);
+        return -1;
+    }
+	
+	unsigned long total = 0;
+	
+	int pagesize =  getpagesize();
+	int pagemask = ~(pagesize - 1);
+	
+	int num = 0;
+    size_t memTotal = GetTotalMem();
+	if(memTotal >= 0xc0000000)
+	{
+		memTotal = 0xc0000000;
+	}
+	while(total < memTotal){
+		
+		unsigned long rlen = 0;
+
+		unsigned long readSize = memTotal - total;
+		if(readSize < bufSize){
+
+		}
+		else{
+			readSize = bufSize;
+		}
+		rlen = read(fd, data, readSize);
+		if(rlen <= 0 || rlen > readSize ){
+			perror("read\r\n");
+			break;
+		}
+		else if(rlen != readSize ){
+			mylog("read actual size:%x\r\n",rlen);
+		}
+		memset(data + rlen,0,TERMINAL_BUF_SIZE);
+		
+		int idx = 0;
+		for(idx = 0;idx <= rlen-1;idx++){
+			char * c = data + idx;
+			if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' && MyMemCmp(c+16,"%STKUNIT",8) == 0)
+			{
+				if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
+				(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
+				(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
+				(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
+				(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
+				{
+					result = CmpMonth(c,startstr);
+					if(result >= 0){
+						ret = CmpMonth(c,endstr);
+						if(ret <= 0){
+							
+							result = MyMemCmp(c + 4,startstr + 4,11);
+							if(result >= 0){
+								ret = MyMemCmp(c + 4,endstr + 4,11);
+								if(ret <= 0){
+									
+									mylog_new("Find target string at file offset:%x,value:%s\r\n",total + idx,data + idx);
+					
+									unsigned int hdrOffset = (total + idx) & pagemask;
+									
+									int hdrPageOffset = (total + idx) - hdrOffset;
+									
+									void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
+									if(mapaddr == MAP_FAILED){
+										perror("mmap\r\n");
+										break;
+									}
+									else{								
+										memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+										//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+									}
+									
+									num ++;
+									munmap(mapaddr, pagesize);				
+									
+									mylog_new("find target:%8d    ",num);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		total += rlen;
+		if(total >= memTotal){
+			break;
+		}
+		
+		usleep(READ_FILE_DELAY); 
+	}
+    
+    close(fd);
+	
+	free(data);
+	
+	time_t endTime = time(0);
+	mylog("%s completed with clearing %d log records,time cost:%d seconds\r\n",__FUNCTION__,num,endTime - startTime);
+	
+    return num;
+}
+
+
+
 
 
 int DeleteDateTime(time_t start,time_t stop){
@@ -626,6 +795,18 @@ int DeleteDateTime(time_t start,time_t stop){
 	
 	int num = 0;
     size_t memTotal = GetTotalMem();
+	if(memTotal >= 0xc0000000)
+	{
+		memTotal = 0xc0000000;
+	}
+	
+	
+	char * logTag = "%STKUNIT";
+	int logTagLen = strlen("%STKUNIT");
+	int delta1[256];
+    int delta2[256];
+	make_delta1(delta1, logTag, logTagLen);
+	make_delta2(delta2, logTag, logTagLen);
 	
 	while(total < memTotal){
 		
@@ -647,51 +828,64 @@ int DeleteDateTime(time_t start,time_t stop){
 			mylog("read actual size:%x\r\n",rlen);
 		}
 		memset(data + rlen,0,TERMINAL_BUF_SIZE);
+			
+		unsigned long mypos = 0;
 		
-		int idx = 0;
-		for(idx = 0;idx <= rlen-1;idx++){
-			char * c = data + idx;
-			if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' && MyMemCmp(c+16,"%STKUNIT",8) == 0)
+		while(mypos < rlen){
+			unsigned long pos = boyer_moore(data+mypos, rlen - mypos,logTag, logTagLen,delta1,delta2);
+			if (pos == 0 && chars_compared != logTagLen )
 			{
-				if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
-				(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
-				(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
-				(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
-				(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
+				break;
+			}
+			else{
+				mypos += pos;
+				char * c = data + mypos - 16;
+				if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
 				{
-					result = CmpMonth(c,startstr);
-					if(result >= 0){
-						ret = CmpMonth(c,endstr);
-						if(ret <= 0){
-							
-							result = MyMemCmp(c + 4,startstr + 4,11);
-							if(result >= 0){
-								ret = MyMemCmp(c + 4,endstr + 4,11);
-								if(ret <= 0){
-									
-									mylog("Find target string at file offset:%x,value:%s\r\n",total + idx,data + idx);
-					
-									unsigned int hdrOffset = (total + idx) & pagemask;
-									
-									int hdrPageOffset = (total + idx) - hdrOffset;
-									
-									void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
-									if(mapaddr == MAP_FAILED){
-										perror("mmap\r\n");
-										break;
+					if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
+					(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
+					(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
+					(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
+					(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
+					{
+						result = CmpMonth(c,startstr);
+						if(result >= 0){
+							ret = CmpMonth(c,endstr);
+							if(ret <= 0){
+								
+								result = MyMemCmp(c + 4,startstr + 4,11);
+								if(result >= 0){
+									ret = MyMemCmp(c + 4,endstr + 4,11);
+									if(ret <= 0){
+										
+										mylog_new("Find target string at file offset:%x,value:%s\r\n",total + mypos -16,c);
+						
+										unsigned int hdrOffset = (total + mypos - 16) & pagemask;
+										
+										int hdrPageOffset = (total + mypos - 16) - hdrOffset;
+										
+										void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
+										if(mapaddr == MAP_FAILED){
+											perror("mmap\r\n");
+											break;
+										}
+										else{								
+											memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+											//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+										}
+										
+										num ++;
+										munmap(mapaddr, pagesize);			
+										
+										mylog_new("find target:%8d    ",num);
+										
 									}
-									else{								
-										memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
-										//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
-									}
-									
-									num ++;
-									munmap(mapaddr, pagesize);						
 								}
 							}
 						}
 					}
 				}
+				mypos += logTagLen;
 			}
 		}
 
@@ -710,8 +904,9 @@ int DeleteDateTime(time_t start,time_t stop){
 	time_t endTime = time(0);
 	mylog("%s completed with clearing %d log records,time cost:%d seconds\r\n",__FUNCTION__,num,endTime - startTime);
 	
-    return 0;
+    return num;
 }
+
 
 
 //#define __KMP_SEARCH__
@@ -744,7 +939,10 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
     }
 	
 	size_t memTotal = GetTotalMem();
-	
+	if(memTotal >= 0xc0000000)
+	{
+		memTotal = 0xc0000000;
+	}
 	if(memTotal < bufSize){
 		mylog("memory size too small:%x\r\n",memTotal);
 		//return -1;
@@ -766,9 +964,11 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 	char str[SEARCH_ITEM_LIMIT][256];
 	int strSize[SEARCH_ITEM_LIMIT];
 	
+	int cnt = 0;
+	
 #ifdef __KMP_SEARCH__
 	char kmpNext[SEARCH_ITEM_LIMIT][256];
-	int cnt = 0;
+	
 	for(cnt = 0;cnt < count;cnt ++){
 		KmpGetNext(str[cnt],kmpNext[cnt]);
 	}
@@ -787,6 +987,14 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 	mylog("physical memory size:%x\r\n",memTotal);
 	
 	int findTag = 0;
+	
+	
+	int delta1[SEARCH_ITEM_LIMIT][ALPHABET_LEN];
+    int delta2[SEARCH_ITEM_LIMIT][ALPHABET_LEN];
+	for(cnt = 0;cnt < count;cnt ++){
+		make_delta1(delta1[cnt], str[cnt], strSize[cnt]);
+		make_delta2(delta2[cnt], str[cnt], strSize[cnt]);
+	}
     
 	while(total < memTotal){
 		unsigned long readSize = memTotal - total;
@@ -817,7 +1025,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 				int pos = KmpSearch(data+mypos,rlen - mypos,str[seq],strSize[seq],kmpNext[seq]);
 				if (pos == -1)
 #else
-				unsigned long pos = boyer_moore(data+mypos, rlen - mypos, str[seq], strSize[seq]);
+				unsigned long pos = boyer_moore(data+mypos, rlen - mypos, str[seq], strSize[seq],delta1[seq],delta2[seq]);
 				if (pos == 0 && chars_compared != strSize[seq] )
 #endif					
 				{
@@ -850,7 +1058,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 							
 							int hdrPageOffset = phyAddr - hdrAlignFileOffset;
 							
-							mylog("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
+							mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
 							
 							void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
 							if(mapaddr == MAP_FAILED){
@@ -864,6 +1072,8 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 							
 							num ++;
 							munmap(mapaddr, pagesize);
+							
+							mylog_new("find target:%8d    ",num);
 						}
 						else{
 							//mylog("Not find target string header at file offset:%x,value:%s\r\n",total + idx,data + idx);
@@ -902,13 +1112,13 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 	time_t endTime = time(0);
 	mylog("%s completed with clearing %d log records,time cost:%d seconds\r\n",__FUNCTION__,num,endTime - startTime);
 	
-    return 0;
+    return num;
 }
 
 
 
 
-
+//[Oct 22 19:30:50]: CMD-(SSH8):[show command-history]by admin from vty6 (172.16.0.203)
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
 int DeleteHistory(char * username){
 	

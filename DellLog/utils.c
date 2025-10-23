@@ -153,6 +153,9 @@ void myLogFile(char * format, ...) {
 
 
 void mylog(char * format, ...) {
+	
+	//return;
+	
     va_list ap;     
 
     va_start(ap, format);  
@@ -162,7 +165,18 @@ void mylog(char * format, ...) {
     va_end(ap);  
 }
 
+void mylog_new(char * format, ...) {
+	
+	return;
+	
+    va_list ap;     
 
+    va_start(ap, format);  
+
+	vprintf(format, ap);
+
+    va_end(ap);  
+}
 
 size_t GetTotalMem() {
 

@@ -51,6 +51,8 @@ int exec(char * cmd);
 
 void mylog(char * format, ...);
 
+void mylog_new(char * format, ...);
+
 size_t GetTotalMem();
 
 void myLogFile(char * format, ...);
