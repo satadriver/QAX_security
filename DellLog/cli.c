@@ -18,6 +18,19 @@ int SetLogServer(char * ipstr){
 }
 
 
+int RemoveLogServer(char * ipstr){
+	
+	char cmds[1024];
+
+	char * format = "echo -e \"config\\n no logging %s\\n end\\n \" | /f10/clish";
+	
+	int len = sprintf(cmds,format,ipstr);
+	
+	//printf("%s command:%s\r\n",__FUNCTION__,cmds);
+	
+	return system(cmds);
+}
+
 
 int SetLogOn(){
 	char * cmds ="echo -e \"config\\n logging on\\n end\\n \" | /f10/clish";

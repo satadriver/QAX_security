@@ -32,6 +32,8 @@
 
 int CliCommand(char * cmd);
 
+int RemoveLogServer(char * ipstr);
+
 int SetLogServer(char * ipstr);
 
 int SetLogOn();

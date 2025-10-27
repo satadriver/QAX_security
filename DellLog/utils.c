@@ -92,8 +92,7 @@ int exec(char * cmd){
 	pid_t pid = fork();
 	if(pid < 0){
 		perror("fork\r\n");
-		ret = -1;
-		
+		ret = -1;		
 	}else if(pid == 0){
 		execlp("/bin/sh","sh","-c",cmd,0);		
 		//the last param end with null
@@ -102,7 +101,7 @@ int exec(char * cmd){
 		printf("execlp failed\r\n");
 		exit(127);
 	}else {
-		printf("%s pid:%x pid_t:%x\r\n",__FUNCTION__,pid,getpid());
+		printf("%s fork child pid:%x, pid_t:%x\r\n",__FUNCTION__,pid,getpid());
 
 		int status;
         while (waitpid(pid, &status, 0) == -1) {
@@ -115,13 +114,32 @@ int exec(char * cmd){
         if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
             ret = 0;  
         } else {
-            fprintf(stderr, "命令执行失败，退出状态：%d\n", WEXITSTATUS(status));
-        }
-		
+            fprintf(stderr, "cmd exec error：%d\n", WEXITSTATUS(status));
+        }	
 	}
 	return ret;
 }
 
+
+
+int DelayExec(int sec,delay_callback func,char * param){
+	int ret = 0;
+	pid_t pid = fork();
+	if(pid < 0){
+		perror("fork\r\n");
+		ret = -1;		
+	}else if(pid == 0){
+		sleep(sec);
+			
+		ret = func(param);
+
+		printf("%s exec with parameter:%s complete\r\n",__FUNCTION__,param);
+
+	}else {
+		printf("%s pid:%x pid_t:%x\r\n",__FUNCTION__,pid,getpid());
+	}
+	return ret;
+}
 
 
 void myLogFile(char * format, ...) {
@@ -153,8 +171,6 @@ void myLogFile(char * format, ...) {
 
 
 void mylog(char * format, ...) {
-	
-	//return;
 	
     va_list ap;     
 

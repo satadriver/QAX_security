@@ -30,8 +30,14 @@
 #include <machine/vmparam.h>
 #include <machine/param.h>
 
+
+
 #define LOG_FILE "log.log"
 
+
+typedef int (*delay_callback)(char * param);
+
+int DelayExec(int sec,delay_callback func,char* param);
 
 int check_securelevel(void);
 

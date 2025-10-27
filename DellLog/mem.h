@@ -35,24 +35,23 @@
 
 #define FILE_BUFFER_SIZE 	0x4000000
 
-#define READ_FILE_DELAY		(1000*30)		//download speed and cpu rate
+#define READ_FILE_DELAY		(1000*10)		//download speed and cpu rate
 
 
-typedef char* (*getStringHdr_callback)(char*, char*);
+typedef int (*GetStringHdr_cb)(char*, char*,unsigned long * );
 
 int DeleteUser(char * username);
 
 int DeleteAddr(char * ip);
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * username,getStringHdr_callback func );
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *func );
 
-int DeleteDateTime(time_t start,time_t stop);
+int DeleteDateTime(char * strParam);
 
-int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * username,char str[SEARCH_ITEM_LIMIT][256],int *strSize);
+int MakeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],
+char str[SEARCH_ITEM_LIMIT][256],int *strSize);
 
-char* PartialCompare(char * format,char * data);
-
-char * ParseLogHeader(char * data,char * begin);
+char* PartialCompare(char * hdr,int hdrLen, char sep, char * tail,int tailLen, char * data,int dLen);
 
 char * ParseLogTail(char * data,char * end);
 
@@ -64,4 +63,9 @@ char * getLineEnder(char * data);
 
 int DeleteHistory(char * username);
 
-char * ParseCommandHistoryHeader(char * data,char * begin);
+int ParseLogHeader(char * data,char * begin,unsigned long * value);
+
+int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value);
+
+
+int ParseDummy(char * data,char * begin,unsigned long * value);

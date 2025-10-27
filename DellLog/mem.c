@@ -3,6 +3,8 @@
 #include <time.h>
 #include "kmp.h"
 
+#define PHYSICAL_MEMORY_LIMIT 0Xf0000000
+
 
 #define ALPHABET_LEN 256
 #define NOT_FOUND patlen
@@ -125,7 +127,7 @@ char * makeTestStr(char * str){
 
 
 //buffer overflow
-char* PartialCompare(char * format,char * data){
+char* PartialCompare_old(char * format,char * data){
 	int formatLen = strlen(format);
 
 	while( *data && *data != '\n' && *data != '\r'){
@@ -164,7 +166,41 @@ char* PartialCompare(char * format,char * data){
 	
 }
 
-
+char* PartialCompare(char * hdr,int hdrLen, char sep, char * tail,int tailLen, char * data,int dLen){
+	int ret = 0;
+	
+	int delta1[256];
+    int delta2[256];
+	make_delta1(delta1, hdr, hdrLen);
+	make_delta2(delta2, hdr, hdrLen);
+	unsigned long mypos = 0;
+	
+	while(mypos < dLen){
+		unsigned long pos = boyer_moore(data+mypos, dLen - mypos, hdr, hdrLen,delta1,delta2);
+		if (pos == 0 && chars_compared != hdrLen )			
+		{
+			break;
+		}else{
+			mypos += pos;
+			
+			mypos += hdrLen;
+			
+			char * ptr = data + mypos;
+			int limit = 0;
+			while( limit++ < 16){
+				if(* ptr++ == sep ){
+					break;
+				}
+			}
+			
+			ret = MyMemCmp(ptr,tail,tailLen);
+			if(ret == 0){
+				
+			}
+		}
+	}
+	return 0;
+}
 
 
 
@@ -230,13 +266,16 @@ char * ParseLogTail(char * data,char * end)
 }
 
 
-char * ParseLogHeader(char * data,char * begin)
+int ParseLogHeader(char * data,char * begin,unsigned long * value)
 {
 	int size = 0;
 	
 	while(data >= begin){
 		
 		if(*data == '\n' || *data == 0|| *data == '\r'){
+			break;
+		}
+		else if(*data < 0x20 || *data >= 0x7f){
 			break;
 		}
 		
@@ -274,7 +313,8 @@ char * ParseLogHeader(char * data,char * begin)
 					(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
 					(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
 					{
-						return c;
+						value[0] = (unsigned long) c;
+						return 1;
 					}
 				}
 				
@@ -292,13 +332,17 @@ char * ParseLogHeader(char * data,char * begin)
 }
 
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
-char * ParseCommandHistoryHeader(char * data,char * begin)
+int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value)
 {
 	int size = 0;
-	
+	int tag = 0;
 	while(data >= begin){
 		
-		if(*data == '\n' || *data == 0|| *data == '\r'){
+		if(*data == 0 || *data == '\n' || *data == '\r')
+		{
+			break;
+		}
+		else if(*data < 0x20 || *data >= 0x7f){
 			break;
 		}
 		
@@ -316,12 +360,20 @@ char * ParseCommandHistoryHeader(char * data,char * begin)
 					(c[11] >= '0' && c[11] <= '9') && (c[12] >= '0' && c[12] <= '9') &&
 					(c[14] >= '0' && c[14] <= '9') && (c[15] >= '0' && c[15] <= '9') )
 					{
-						return c;
+						//return c;
+						value[0] = (unsigned long) c;
+						return 1;
+						tag ++;
 					}
 				}
-				
 			}
 		}
+		/*
+		else if(tag == 1 && MyMemCmp(data,"\t - Repeated ",13) == 0){
+			value[1] = (unsigned long) data;
+			return 2;
+		}
+		*/
 		
 		data --;
 
@@ -329,11 +381,12 @@ char * ParseCommandHistoryHeader(char * data,char * begin)
 			break;
 		}
 	}
-		
+	
 	return 0;
 }
 
-int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char str[SEARCH_ITEM_LIMIT][256],int *strSize)
+int MakeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],
+char str[SEARCH_ITEM_LIMIT][256],int *strSize)
 {
 	pid_t mypid = getpid();
 	char * szboundary = "this is my bundary";
@@ -341,7 +394,7 @@ int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char s
 	int total = 0;
 	int i = 0;
 	for( i = 0;i < count;i ++){
-		int length = sprintf(str[i],format[i],tag);
+		int length = sprintf(str[i],format[i],tag[i]);
 		
 		int len = strlen(str[i]);
 		
@@ -372,7 +425,7 @@ int makeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,char s
 
 
 
-int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getStringHdr_callback GetStrHdr) {
+int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr) {
 	int result = 0;
 	
     int fd = 0;
@@ -400,9 +453,9 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
     }
 	
 	size_t memTotal = GetTotalMem();
-	if(memTotal >= 0xc0000000)
+	if(memTotal >= PHYSICAL_MEMORY_LIMIT)
 	{
-		memTotal = 0xc0000000;
+		memTotal = PHYSICAL_MEMORY_LIMIT;
 	}
 	
 	if(memTotal < bufSize){
@@ -410,21 +463,17 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 		//return -1;
 	}
 	
-	off_t  filepos = memTotal - bufSize;
-	
-	filepos = 0xb0000000;
-	filepos = 0;
+	off_t  filepos = 0x01000000;
 	off_t  newpos = lseek(fd,filepos,SEEK_SET);
 	if(filepos != newpos){
 		mylog("lseek:%x error\r\n",filepos);
 	}
-	
-	unsigned long total = 0;
+	unsigned long total = filepos;
 	
 	char str[SEARCH_ITEM_LIMIT][256];
 	int strSize[SEARCH_ITEM_LIMIT];
 	//makeTestStr(str);
-	result = makeLoginTag(format,count,tag,str,strSize);
+	result = MakeLoginTag(format,count,tag,str,strSize);
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
@@ -461,6 +510,7 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 		//int cmpsize = rlen - strSize;
 		int idx = 0;
 		int seq = 0;
+		int cnt = 0;
 		for(idx = 0;idx <= rlen-1;idx++)
 		{
 
@@ -487,19 +537,21 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 							//int strOffset = (unsigned long)str[seq] % pagesize;
 							//if( (idx % pagesize) != strOffset )
 							{
-								char * lineHdr = GetStrHdr(data + idx,data);
-								if(lineHdr){
+								unsigned long value[16];
+								int paramCnt = GetStrHdr[seq](data + idx,data,value);
+								if(paramCnt){
+									
+									for(cnt = 0; cnt < paramCnt;cnt ++)
 									//char * lineEnd = ParseLogTail(data + idx, data + rlen);
-									//if(lineEnd)
 									{
-										
-										unsigned int phyAddr =  total + (lineHdr - data);
+										unsigned long phyAddr =  total + (value[cnt] - (unsigned long)data);
 							
-										unsigned int hdrAlignFileOffset = phyAddr & pagemask;
+										unsigned long hdrAlignFileOffset = phyAddr & pagemask;
 										
-										int hdrPageOffset = phyAddr - hdrAlignFileOffset;
+										unsigned long hdrPageOffset = phyAddr - hdrAlignFileOffset;
 										
-										mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
+										mylog_new("Find target string at file offset:%x,value:%s\r\n",
+										(char*)phyAddr,(char*)value[cnt]);
 
 										void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
 										if(mapaddr == MAP_FAILED){
@@ -571,17 +623,30 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getSt
 }
 
 
-int DeleteDateTime_old(time_t start,time_t stop){
+
+	
+int DeleteDateTime_old(char * strParam){
+	time_t start;
+	time_t stop;
+	
+	char * sep = strstr(strParam,"-");
+	if(sep){
+		char strStart[256]={0};
+		char strStop[256]={0};
+		memcpy(strStart,strParam,sep - strParam);
+		strcpy(strStop,sep + 1);
+		start = strtoul(strStart,0,10);
+		stop = strtoul(strStop,0,10);
+	}
+	else{
+		return 0;
+	}
 	
 	time_t startTime = time(0);
 	struct tm * tm_start = localtime(&startTime);
 	if(tm_start){
 		mylog("%s start date time:%04d/%02d/%02d %02d:%02d:%02d\r\n",__FUNCTION__,
 		tm_start->tm_year+1900,tm_start->tm_mon+1,tm_start->tm_mday,tm_start->tm_hour,tm_start->tm_min,tm_start->tm_sec);
-	}
-	
-	if(stop == -1 ){
-		stop = time(0);
 	}
 	
 	start = time(0) - start ;
@@ -628,16 +693,21 @@ int DeleteDateTime_old(time_t start,time_t stop){
         return -1;
     }
 	
-	unsigned long total = 0;
+	off_t  filepos = 0x01000000;
+	off_t  newpos = lseek(fd,filepos,SEEK_SET);
+	if(filepos != newpos){
+		mylog("lseek:%x error\r\n",filepos);
+	}
+	unsigned long total = filepos;
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
 	
 	int num = 0;
     size_t memTotal = GetTotalMem();
-	if(memTotal >= 0xc0000000)
+	if(memTotal >= PHYSICAL_MEMORY_LIMIT)
 	{
-		memTotal = 0xc0000000;
+		memTotal = PHYSICAL_MEMORY_LIMIT;
 	}
 	while(total < memTotal){
 		
@@ -731,7 +801,27 @@ int DeleteDateTime_old(time_t start,time_t stop){
 
 
 
-int DeleteDateTime(time_t start,time_t stop){
+int DeleteDateTime(char * strParam){
+	
+	time_t start;
+	time_t stop;
+	
+	char * sep = strstr(strParam,"-");
+	if(sep){
+
+	}
+	else{
+		sep = strstr(strParam,"_");
+		if(sep == 0){
+			return 0;
+		}
+	}
+	char strStart[256]={0};
+	char strStop[256]={0};
+	memcpy(strStart,strParam,sep - strParam);
+	strcpy(strStop,sep + 1);
+	start = strtoul(strStart,0,10);
+	stop = strtoul(strStop,0,10);
 	
 	time_t startTime = time(0);
 	struct tm * tm_start = localtime(&startTime);
@@ -740,16 +830,12 @@ int DeleteDateTime(time_t start,time_t stop){
 		tm_start->tm_year+1900,tm_start->tm_mon+1,tm_start->tm_mday,tm_start->tm_hour,tm_start->tm_min,tm_start->tm_sec);
 	}
 	
-	if(stop == -1 ){
-		stop = time(0);
-	}
-	
 	start = time(0) - start ;
 	stop = time(0) - stop ;
-	
 	if(start == 0 || start >= stop){
 		return 0;
 	}
+
 	
 	mylog("start:%d,end:%d\r\n",start,stop);
 	
@@ -788,16 +874,21 @@ int DeleteDateTime(time_t start,time_t stop){
         return -1;
     }
 	
-	unsigned long total = 0;
+	off_t  filepos = 0x01000000;
+	off_t  newpos = lseek(fd,filepos,SEEK_SET);
+	if(filepos != newpos){
+		mylog("lseek:%x error\r\n",filepos);
+	}
+	unsigned long total = filepos;
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
 	
 	int num = 0;
     size_t memTotal = GetTotalMem();
-	if(memTotal >= 0xc0000000)
+	if(memTotal >= PHYSICAL_MEMORY_LIMIT)
 	{
-		memTotal = 0xc0000000;
+		memTotal = PHYSICAL_MEMORY_LIMIT;
 	}
 	
 	
@@ -911,7 +1002,7 @@ int DeleteDateTime(time_t start,time_t stop){
 
 //#define __KMP_SEARCH__
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getStringHdr_callback GetStrHdr) {
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr) {
 	int result = 0;
 	
     int fd = 0;
@@ -939,27 +1030,21 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
     }
 	
 	size_t memTotal = GetTotalMem();
-	if(memTotal >= 0xc0000000)
+	if(memTotal >= PHYSICAL_MEMORY_LIMIT)
 	{
-		memTotal = 0xc0000000;
+		memTotal = PHYSICAL_MEMORY_LIMIT;
 	}
 	if(memTotal < bufSize){
 		mylog("memory size too small:%x\r\n",memTotal);
 		//return -1;
 	}
 	
-	off_t  filepos = memTotal - bufSize;
-	if((int)filepos <= 0){
-		filepos = 0;
-	}
-	filepos = 0;
-	//filepos = 0xb0000000;
+	off_t  filepos = 0x01000000;
 	off_t  newpos = lseek(fd,filepos,SEEK_SET);
 	if(filepos != newpos){
 		mylog("lseek:%x error\r\n",filepos);
 	}
-	
-	unsigned long total = 0;
+	unsigned long total = filepos;
 	
 	char str[SEARCH_ITEM_LIMIT][256];
 	int strSize[SEARCH_ITEM_LIMIT];
@@ -974,7 +1059,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 	}
 #endif
 	//makeTestStr(str);
-	result = makeLoginTag(format,count,tag,str,strSize);
+	result = MakeLoginTag(format,count,tag,str,strSize);
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
@@ -1046,34 +1131,34 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 					}
 					else{
 						//mylog("Found at position:%x,string:%s,chars compared:%d\r\n", findPos,data + findPos,chars_compared);
-						
-						char * lineHdr = GetStrHdr(data + findPos,data);
-						if(lineHdr){
-							
-							//unsigned int hdrOffset = (total + findPos) & pagemask;
-							
-							unsigned int phyAddr =  total + (lineHdr - data);
-							
-							unsigned int hdrAlignFileOffset = phyAddr & pagemask;
-							
-							int hdrPageOffset = phyAddr - hdrAlignFileOffset;
-							
-							mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,lineHdr);
-							
-							void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
-							if(mapaddr == MAP_FAILED){
-								perror("mmap\r\n");
-								break;
+						unsigned long value[16];
+						int paramCnt = GetStrHdr[seq](data + findPos,data,value);
+						if(paramCnt){
+							for(cnt = 0;cnt < paramCnt;cnt ++)
+							{
+								unsigned long phyAddr =  total + (value[cnt] - (unsigned long) data);
+								
+								unsigned long hdrAlignFileOffset = phyAddr & pagemask;
+								
+								unsigned long hdrPageOffset = phyAddr - hdrAlignFileOffset;
+								
+								mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,(char*)value[cnt]);
+								
+								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
+								if(mapaddr == MAP_FAILED){
+									perror("mmap\r\n");
+									break;
+								}
+								else{						
+									memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+									//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+								}
+								
+								num ++;
+								munmap(mapaddr, pagesize);
+								
+								mylog_new("find target:%8d    ",num);
 							}
-							else{						
-								memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
-								//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
-							}
-							
-							num ++;
-							munmap(mapaddr, pagesize);
-							
-							mylog_new("find target:%8d    ",num);
 						}
 						else{
 							//mylog("Not find target string header at file offset:%x,value:%s\r\n",total + idx,data + idx);
@@ -1117,32 +1202,28 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char * tag,getString
 
 
 
-
+//[Oct 23 12:08:53]: CMD-(TEL17):[show packages system]by root from vty15
 //[Oct 22 19:30:50]: CMD-(SSH8):[show command-history]by admin from vty6 (172.16.0.203)
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
 int DeleteHistory(char * username){
 	
 	int ret = 0;
 	
-	/*
-	char buf[1024];
-	int cmdlen = strlen(cmd);
-	if(cmd[0] == '\"' && cmd[cmdlen-1] == '\"'){
-		memcpy(buf,cmd+1,cmdlen - 2);
-		buf[cmdlen-2]=0;
-	}
-	else{
-		strcpy(buf,cmd);
-	}
-	char cmdstr[1024];
-	sprintf(cmdstr,"]by %s from ",cmd);
-	*/
+	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	
 	int seq = 0;
+	strcpy(tag[seq],username);
+	callback[seq] = ParseCommandHistoryHeader;
 	strcpy(format[seq++],"]by %s from ");
+	
+	strcpy(tag[seq],"");
+	callback[seq] = ParseDummy;
+	strcpy(format[seq++],"\t - Repeated %s");
 
-	ret = deleteLog(format,seq,username,ParseCommandHistoryHeader);
+	ret = deleteLog(format,seq,tag,callback);
 	
 	return ret;
 	
@@ -1151,13 +1232,18 @@ int DeleteHistory(char * username){
 
 int DeleteAddr(char * ip){
 	int ret = 0;
+	char tag[SEARCH_ITEM_LIMIT][256];
+	
 	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
 	int seq = 0;
 	if(ip){
 		seq = 0;
-		 strcpy(format[seq++]," ( %s )");
+		strcpy(tag[seq],ip);
+		callback[seq] = ParseLogHeader;
+		strcpy(format[seq++]," ( %s )");
 		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
-		ret = deleteLog(format,seq,ip,ParseLogHeader);
+		ret = deleteLog(format,seq,tag,callback);
 	}
 	
 	return 0;
@@ -1172,22 +1258,30 @@ int DeleteAddr(char * ip){
 int DeleteUser(char * username){
 	
 	int ret = 0;
-	/*
-	ret = deleteLog("-LOGOUT: Exec session is terminated for user %s on line ","admin");
-	ret = deleteLog("-LOGIN_SUCCESS: Login successful for user %s on line ","admin");
-	ret = deleteLog("-CONCURRENT_LOGIN: User %s has ","admin");
-	if(ip){
-		ret = deleteLog("-CONNECTION: Disconnected from %s\n",ip);
-	}
-	*/
+	
+	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	
 	int seq = 0;
+	strcpy(tag[seq],username);
+	callback[seq] = ParseLogHeader;
 	strcpy(format[seq++],"-LOGOUT: Exec session is terminated for user %s on line ");
+	strcpy(tag[seq],username);
+	callback[seq] = ParseLogHeader;
 	strcpy(format[seq++],"-LOGIN_SUCCESS: Login successful for user %s on line ");
+	strcpy(tag[seq],username);
+	callback[seq] = ParseLogHeader;
 	strcpy(format[seq++],"-CONCURRENT_LOGIN: User %s has ");
 	
-	ret = deleteLog(format,seq,username,ParseLogHeader);
+	ret = deleteLog(format,seq,tag,callback);
 	
 	return ret;
+}
+
+
+int ParseDummy(char * data,char * begin,unsigned long * value){
+	value[0] =(unsigned long) data;
+	return 1;
 }

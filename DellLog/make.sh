@@ -1,7 +1,6 @@
 #!/bin/sh
 
-#cd /root/ljg/DellLog
-#pwd | more
+
 
 echo "delete old files..."
 rm -rf ./dell
