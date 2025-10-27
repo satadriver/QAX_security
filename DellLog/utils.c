@@ -8,6 +8,9 @@
 #include <stdarg.h>
 #include <sys/wait.h>
 
+
+int g_trace_log = 0;
+
 int check_securelevel(void) {
     int securelevel;
     size_t len = sizeof(securelevel);
@@ -134,6 +137,8 @@ int DelayExec(int sec,delay_callback func,char * param){
 		ret = func(param);
 
 		printf("%s exec with parameter:%s complete\r\n",__FUNCTION__,param);
+		
+		exit(0);
 
 	}else {
 		printf("%s pid:%x pid_t:%x\r\n",__FUNCTION__,pid,getpid());
@@ -178,20 +183,21 @@ void mylog(char * format, ...) {
 
 	vprintf(format, ap);
 
-    va_end(ap);  
+    va_end(ap); 
 }
 
 void mylog_new(char * format, ...) {
 	
-	return;
-	
-    va_list ap;     
+	if(g_trace_log){
+		
+		va_list ap;     
 
-    va_start(ap, format);  
+		va_start(ap, format); 
 
-	vprintf(format, ap);
+		vprintf(format, ap);
 
-    va_end(ap);  
+		va_end(ap);  
+	}
 }
 
 size_t GetTotalMem() {

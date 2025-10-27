@@ -1116,6 +1116,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 				{
 					break;
 				}else{
+					unsigned long oldPos = mypos; 
 					mypos += pos;
 					
 					unsigned long findPos = mypos;
@@ -1132,7 +1133,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 					else{
 						//mylog("Found at position:%x,string:%s,chars compared:%d\r\n", findPos,data + findPos,chars_compared);
 						unsigned long value[16];
-						int paramCnt = GetStrHdr[seq](data + findPos,data,value);
+						int paramCnt = GetStrHdr[seq](data + findPos,data + oldPos,value);
 						if(paramCnt){
 							for(cnt = 0;cnt < paramCnt;cnt ++)
 							{
@@ -1221,7 +1222,7 @@ int DeleteHistory(char * username){
 	
 	strcpy(tag[seq],"");
 	callback[seq] = ParseDummy;
-	strcpy(format[seq++],"\t - Repeated %s");
+	//strcpy(format[seq++],"\t - Repeated %s");
 
 	ret = deleteLog(format,seq,tag,callback);
 	

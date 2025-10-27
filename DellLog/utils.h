@@ -34,6 +34,8 @@
 
 #define LOG_FILE "log.log"
 
+extern int g_trace_log;
+
 
 typedef int (*delay_callback)(char * param);
 

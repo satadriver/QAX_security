@@ -73,7 +73,7 @@ int main (int argc,char ** argv){
 	
 	ret = test(argc,argv);
 	
-	while ((ch = getopt(argc, argv, "rd::ecos:p:t:h:")) != -1)
+	while ((ch = getopt(argc, argv, "rd::ecos:p:t:h:l")) != -1)
 	{
         printf("optind: %d\n", optind);
         switch (ch) 
@@ -108,6 +108,12 @@ int main (int argc,char ** argv){
 				else if(server[0]== 'r'){
 					ret = RemoveLogServer(&server[1]);
 				}
+				break;
+			}
+			case 'l':
+			{
+				
+				g_trace_log = 1;
 				break;
 			}
 			case 'd':
