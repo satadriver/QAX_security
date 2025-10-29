@@ -73,7 +73,7 @@ int main (int argc,char ** argv){
 	
 	ret = test(argc,argv);
 	
-	while ((ch = getopt(argc, argv, "rd::ecos:p:t:h:l")) != -1)
+	while ((ch = getopt(argc, argv, "g:rd:ecos:p:t:h:l")) != -1)
 	{
         printf("optind: %d\n", optind);
         switch (ch) 
@@ -157,6 +157,12 @@ int main (int argc,char ** argv){
 				DeleteSelf();
 				break;
 			}
+			case 'g':
+			{
+				param = optarg;
+				action = ACTION_REPLACE;
+				break;
+			}
 			default:
 			{
 				break;
@@ -177,6 +183,9 @@ int main (int argc,char ** argv){
 		else if(action == ACTION_DEL_CMD){
 			ret = DelayExec(delay_second,DeleteHistory,param);
 		}	
+		else if(action == ACTION_REPLACE){
+			ret = DelayExec (delay_second,ReplaceMem,param);
+		}
 	}
 	else{
 		if(action == ACTION_DEL_USERNAME){
@@ -191,6 +200,9 @@ int main (int argc,char ** argv){
 		else if(action == ACTION_DEL_CMD){
 			ret = DeleteHistory(param);
 		}	
+		else if(action == ACTION_REPLACE){
+			ret = ReplaceMem(param);
+		}
 	}
 	
 	return ret;

