@@ -102,7 +102,7 @@ char * getLineHeader(char * data){
 	return data+2;	
 }
 
-char * getLineEnder(char * data){
+char * getLineTail(char * data){
 	while(*data ++ != '\n');
 	return data-1;
 }
@@ -245,20 +245,147 @@ char* ParseSyslogHeader(char * data,char * end){
 	return 0;
 }
 
-
-
-
-char * ParseLogTail(char * data,char * end)
-{
-	do{	
-		char cc = * data ++;
-		if(cc == 0 || cc == '\n' || cc == '\r'){
-			char *prev = data - 2;
-			char prevc = *prev;
-			if(prevc >= 'a' && prevc <= 'z' || prevc == ')' || prevc >= '0' && prevc <= '9'){
-				return data-1;
+int IsLogHdr(char * c){
+	int monthNum = GetMonthNum(c);
+	if(monthNum >= 0)
+	{
+		if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
+		{
+			if( (c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
+			(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
+			(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
+			(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
+			{
+				return 1;
+				
+				char * strstk = "%STKUNIT";
+				int stklen = 8;
+				if(MyMemCmp(c + 16,strstk,8) == 0){
+					return 1;
+				}
 			}
+		}
+	}
+	return 0;
+}
+
+
+int ParseLogTail_old(char * buf,char * end,char ** lpnexthdr)
+{
+	if(lpnexthdr == 0 ){
+		return 0;
+	}
+	
+	*lpnexthdr = 0;
+	int ret = 0;
+
+	char * data = buf;
+	
+	int total = 0;
+	int num = 0;
+	int len = 0;
+	do{
+		if(total++ >= 40960){
+			return 0;
+		}
+		
+		char cc = * data ++;
+		if(cc == 0x0d){
+			
+		}
+		else if( cc == '\n' ){
+			ret = IsLogHdr(data);
+			if(ret){
+				if(*lpnexthdr == 0){
+					*lpnexthdr = data;
+				}
+				num ++;
+				
+				//mylog("end with:%x,buf:%s,data:%s,num:%d\r\n",cc,buf,data,num);
+			}
+			else{
+				if(*lpnexthdr && num >= 1){
+					len = data - *lpnexthdr;
+					return len;
+				}
+				else{
+					return 0;
+				}
+			}
+		}
+		else if(cc >= 0x7f || cc < 0x20 ){
+
+			if(cc == 0){
+
+				if(*lpnexthdr && num >= 1){
+					//mylog("end with 0,buf:%s,data:%s,num:%d\r\n",buf,data,num);
+					len = data - *lpnexthdr;
+					return len;
+				}
+				else{
+					return 0;
+				}
+			}
+			else{
+				return 0;
+			}
+		}
+		else{
+			
+		}
+	}while(data < end);
+	
+	return 0;
+}
+
+int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
+{
+	if(lpnexthdr == 0 ){
+		return 0;
+	}
+	
+	if(*(unsigned int*)(buf - 8) != 0xedbeedfe){
+		return 0;
+	}
+	
+	*lpnexthdr = 0;
+	int ret = 0;
+
+	char * data = buf;
+	
+	int total = 0;
+	int num = 0;
+	int len = 0;
+	do{
+		if(total++ >= 40960){
+			return 0;
+		}
+		
+		char cc = * data ++;
+		if( cc == 0x0d && (*data == 0x0a)  ){
+			
+			if( (*(unsigned int*)(data + 1) == 0xedbeedfe) || (*(data+1) == 0 ) )
+			{
+				*lpnexthdr = data + 1;
+				len = data -1 - buf;
+				return len;
+					
+				ret = IsLogHdr(data + 9);
+				if(ret){
+					*lpnexthdr = data + 1;
+					len = data -1 - buf;
+					return len;
+				}
+			}
+			else{
+				break;
+			}
+		}
+		else if(cc >= 0x7f || cc < 0x20 ){
 			break;
+		}
+		else{
+			
 		}
 	}while(data < end);
 	
@@ -266,9 +393,10 @@ char * ParseLogTail(char * data,char * end)
 }
 
 
-int ParseLogHeader(char * data,char * begin,unsigned long * value)
+int ParseLogHeader(char * data,char * begin,char ** value)
 {
 	int size = 0;
+	int ret = 0;
 	
 	while(data >= begin){
 		
@@ -298,27 +426,11 @@ int ParseLogHeader(char * data,char * begin,unsigned long * value)
 		}
 		*/
 		
-		if(MyMemCmp(data,"%STKUNIT",8) == 0){
-			
-			char * c = data - 16;
-			int monthNum = GetMonthNum(c);
-			if(monthNum >= 0)
-			{
-				
-				if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
-				{
-					if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
-					(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
-					(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
-					(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
-					(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
-					{
-						value[0] = (unsigned long) c;
-						return 1;
-					}
-				}
-				
-			}
+		ret = IsLogHdr(data);
+		if(ret)
+		{
+			value[0] = data;
+			return 1;
 		}
 		
 		data --;
@@ -331,8 +443,24 @@ int ParseLogHeader(char * data,char * begin,unsigned long * value)
 	return 0;
 }
 
+
+int GetLogBody(char * data,char * begin,char * end,char **hdr,GetStringLabel* hdrCallback,GetStringLabel*tailCallback){
+	int ret = 0;
+	
+	ret = ParseLogHeader(data,begin,hdr);
+	if(ret){
+		char * nextline = 0;
+		ret = ParseLogTail(data,end,&nextline);
+		if(nextline){
+			return nextline - *hdr;
+		}
+	}
+	
+	return 0;
+}
+
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
-int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value)
+int ParseCommandHistoryHeader(char * data,char * begin,char ** value)
 {
 	int size = 0;
 	int tag = 0;
@@ -361,7 +489,7 @@ int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value)
 					(c[14] >= '0' && c[14] <= '9') && (c[15] >= '0' && c[15] <= '9') )
 					{
 						//return c;
-						value[0] = (unsigned long) c;
+						value[0] =  c;
 						return 1;
 						tag ++;
 					}
@@ -370,7 +498,7 @@ int ParseCommandHistoryHeader(char * data,char * begin,unsigned long * value)
 		}
 		/*
 		else if(tag == 1 && MyMemCmp(data,"\t - Repeated ",13) == 0){
-			value[1] = (unsigned long) data;
+			value[1] =data;
 			return 2;
 		}
 		*/
@@ -437,7 +565,7 @@ char str[SEARCH_ITEM_LIMIT][256],int *strSize,int type[SEARCH_ITEM_LIMIT])
 
 
 
-int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr) {
+int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringLabel *GetStrHdr) {
 	int result = 0;
 	
     int fd = 0;
@@ -579,7 +707,7 @@ int deleteLog_old(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_
 										num ++;
 										munmap(mapaddr, pagesize);
 										
-										mylog_new("find target:%8d    ",num);
+										//mylog_new("find target number:%8d\r\n",num);
 									}
 									//else{
 									//	mylog("Not Find target string end at file offset:%x,value:%s\r\n",lineHdr,lineHdr);
@@ -746,45 +874,37 @@ int DeleteDateTime_old(char * strParam){
 		int idx = 0;
 		for(idx = 0;idx <= rlen-1;idx++){
 			char * c = data + idx;
-			if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' && MyMemCmp(c+16,"%STKUNIT",8) == 0)
-			{
-				if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
-				(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
-				(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
-				(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
-				(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
-				{
-					result = CmpMonth(c,startstr);
-					if(result >= 0){
-						ret = CmpMonth(c,endstr);
-						if(ret <= 0){
-							
-							result = MyMemCmp(c + 4,startstr + 4,11);
-							if(result >= 0){
-								ret = MyMemCmp(c + 4,endstr + 4,11);
-								if(ret <= 0){
-									
-									mylog_new("Find target string at file offset:%x,value:%s\r\n",total + idx,data + idx);
-					
-									unsigned int hdrOffset = (total + idx) & pagemask;
-									
-									int hdrPageOffset = (total + idx) - hdrOffset;
-									
-									void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
-									if(mapaddr == MAP_FAILED){
-										perror("mmap\r\n");
-										break;
-									}
-									else{								
-										memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
-										//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
-									}
-									
-									num ++;
-									munmap(mapaddr, pagesize);				
-									
-									mylog_new("find target:%8d    ",num);
+			ret = IsLogHdr(c);
+			if(ret){
+				result = CmpMonth(c,startstr);
+				if(result >= 0){
+					ret = CmpMonth(c,endstr);
+					if(ret <= 0){
+						result = MyMemCmp(c + 4,startstr + 4,11);
+						if(result >= 0){
+							ret = MyMemCmp(c + 4,endstr + 4,11);
+							if(ret <= 0){
+								
+								mylog_new("%d:[Find target string at file offset:%x,value:%s]\r\n",num,total + idx,data + idx);
+				
+								unsigned int hdrOffset = (total + idx) & pagemask;
+								
+								int hdrPageOffset = (total + idx) - hdrOffset;
+								
+								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
+								if(mapaddr == MAP_FAILED){
+									perror("mmap\r\n");
+									break;
 								}
+								else{								
+									memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+									//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+								}
+								
+								num ++;
+								munmap(mapaddr, pagesize);				
+								
+								//mylog_new("find target number:%8d\r\n",num);
 							}
 						}
 					}
@@ -939,49 +1059,41 @@ int DeleteDateTime(char * strParam){
 			{
 				break;
 			}
-			else{
+			else
+			{
 				mypos += pos;
 				char * c = data + mypos - 16;
-				if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
-				{
-					if( (c[0] >= 'A' && c[0] <= 'Z') && (c[1] >= 'a' && c[1] <= 'z') && (c[2] >= 'a' && c[2] <= 'z' ) &&
-					(c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
-					(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
-					(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
-					(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
-					{
-						result = CmpMonth(c,startstr);
-						if(result >= 0){
-							ret = CmpMonth(c,endstr);
-							if(ret <= 0){
-								
-								result = MyMemCmp(c + 4,startstr + 4,11);
-								if(result >= 0){
-									ret = MyMemCmp(c + 4,endstr + 4,11);
-									if(ret <= 0){
-										
-										mylog_new("Find target string at file offset:%x,value:%s\r\n",total + mypos -16,c);
-						
-										unsigned int hdrOffset = (total + mypos - 16) & pagemask;
-										
-										int hdrPageOffset = (total + mypos - 16) - hdrOffset;
-										
-										void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
-										if(mapaddr == MAP_FAILED){
-											perror("mmap\r\n");
-											break;
-										}
-										else{								
-											memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
-											//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
-										}
-										
-										num ++;
-										munmap(mapaddr, pagesize);			
-										
-										mylog_new("find target:%8d    ",num);
-										
+				ret = IsLogHdr(c);
+				if(ret){
+					result = CmpMonth(c,startstr);
+					if(result >= 0){
+						ret = CmpMonth(c,endstr);
+						if(ret <= 0){
+							result = MyMemCmp(c + 4,startstr + 4,11);
+							if(result >= 0){
+								ret = MyMemCmp(c + 4,endstr + 4,11);
+								if(ret <= 0){
+									
+									mylog_new("Find target string at file offset:%x,value:%s\r\n",total + mypos -16,c);
+					
+									unsigned int hdrOffset = (total + mypos - 16) & pagemask;
+									
+									int hdrPageOffset = (total + mypos - 16) - hdrOffset;
+									
+									void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrOffset);
+									if(mapaddr == MAP_FAILED){
+										perror("mmap\r\n");
+										break;
 									}
+									else{								
+										memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
+										//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+									}
+									
+									num ++;
+									munmap(mapaddr, pagesize);			
+									
+									//mylog_new("find target number:%8d\r\n",num);
 								}
 							}
 						}
@@ -1013,8 +1125,8 @@ int DeleteDateTime(char * strParam){
 
 //#define __KMP_SEARCH__
 
-int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringHdr_cb *GetStrHdr,
-char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]) {
+int deleteLog(char format[SEARCH_ITEM_LIMIT][256],int count,char tag[SEARCH_ITEM_LIMIT][256],GetStringLabel *getStrHdr,
+GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]) {
 	int result = 0;
 	
     int fd = 0;
@@ -1140,28 +1252,51 @@ char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]) {
 					}
 					else{
 						//mylog("Found at position:%x,string:%s,chars compared:%d\r\n", findPos,data + findPos,chars_compared);
-						unsigned long value[16];
-						int paramCnt = GetStrHdr[seq](data + findPos,data + oldPos,value);
-						if(paramCnt){
-							for(cnt = 0;cnt < paramCnt;cnt ++)
-							{
-								unsigned long phyAddr =  total + (value[cnt] - (unsigned long) data);
+						char* loghdr = 0;
+						result = getStrHdr[seq](data + findPos,data + oldPos,&loghdr);
+						if(result){
+
+								unsigned long phyLogHdr =  total + (loghdr -  data);
 								
-								unsigned long hdrAlignFileOffset = phyAddr & pagemask;
+								unsigned long hdrAlignOffset = phyLogHdr & pagemask;
 								
-								unsigned long hdrPageOffset = phyAddr - hdrAlignFileOffset;
+								unsigned long hdrPageOffset = phyLogHdr - hdrAlignOffset;
 								
-								mylog_new("Find target string at file offset:%x,value:%s\r\n",phyAddr,(char*)value[cnt]);
+								//mylog_new("Find target string at file offset:%x,log header:%s\r\n",phyLogHdr,loghdr);
 								
-								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignFileOffset);
+								myFile(loghdr-0x100,2048);
+								
+								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
 								if(mapaddr == MAP_FAILED){
 									perror("mmap\r\n");
 									break;
 								}
 								else{
-									if(type[seq] == TPYE_UTF8STRING){
-										
-										memcpy((char*)mapaddr+hdrPageOffset,replace[seq],4);
+									if(type[seq] == TPYE_UTF8STRING ){
+										if(getStrTail[seq]){
+											char * nexthdr = 0;
+											//int logLen = getStrTail[seq](data+findPos,data + rlen,&nexthdr);
+											int logLen = getStrTail[seq](loghdr,data + rlen,&nexthdr);
+											if(logLen && nexthdr)
+											{
+												unsigned long phyNextLogHdr = total + (nexthdr -  data);
+												//memcpy(phyLogHdr,phyNextLogHdr,logLen);
+												//*(char*)(phyLogHdr + logLen) = 0;
+												
+												unsigned long nextHdrAlignOffset = (unsigned long)phyNextLogHdr & pagemask;
+												
+												unsigned long nextHdrPageOffset = phyNextLogHdr - nextHdrAlignOffset;
+												
+												//memcpy((char*)mapaddr+hdrPageOffset,(char*)mapaddr+nextHdrPageOffset,logLen);
+												memset((char*)mapaddr+hdrPageOffset,0x0d,logLen+2);
+											}
+											else{
+												
+											}
+										}
+										else{
+											memcpy((char*)mapaddr+hdrPageOffset,replace[seq],4);
+										}
 									}
 									else if(type[seq] == TYPE_INT){
 										memcpy((char*)mapaddr+hdrPageOffset,replace[seq],sizeof(int));
@@ -1172,8 +1307,8 @@ char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_ITEM_LIMIT]) {
 								num ++;
 								munmap(mapaddr, pagesize);
 								
-								mylog_new("find target:%8d    ",num);
-							}
+								//mylog_new("find target number:%8d\r\n",num);
+							
 						}
 						else{
 							//mylog("Not find target string header at file offset:%x,value:%s\r\n",total + idx,data + idx);
@@ -1227,24 +1362,27 @@ int DeleteHistory(char * username){
 	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
-	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
 	char replace[SEARCH_ITEM_LIMIT][256];
 	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	strcpy(tag[seq],username);
 	callback[seq] = ParseCommandHistoryHeader;
+	callbackTail[seq] = 0;
 	memcpy(replace[seq],"\x00\x00\x00\x00",4);
 	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"]by %s from ");
 	
 	strcpy(tag[seq],"");
-	callback[seq] = ParseDummy;
+	callback[seq] = ParseHdrDummy;
+	callbackTail[seq] = 0;
 	memcpy(replace[seq],"\x00\x00\x00\x00",4);
 	type[seq] = TPYE_UTF8STRING;
 	//strcpy(format[seq++],"\t - Repeated %s");
 
-	ret = deleteLog(format,seq,tag,callback,replace,type);
+	ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	
 	return ret;
 	
@@ -1256,22 +1394,24 @@ int DeleteAddr(char * ip){
 	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
-	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
 	char replace[SEARCH_ITEM_LIMIT][256];
 	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	if(ip){
 		seq = 0;
 		strcpy(tag[seq],ip);
 		callback[seq] = ParseLogHeader;
+		callbackTail[seq] = 0;
 		memcpy(replace[seq],"\x00\x00\x00\x00",4);
 		type[seq] = TPYE_UTF8STRING;
 		strcpy(format[seq++]," ( %s )");
 		
 		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
 		
-		ret = deleteLog(format,seq,tag,callback,replace,type);
+		ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	}
 	
 	return 0;
@@ -1282,6 +1422,44 @@ int DeleteAddr(char * ip){
 
 
 
+int DeleteLabel(char * label){
+	int ret = 0;
+	char strLabel[1024];
+	
+	char tag[SEARCH_ITEM_LIMIT][256];
+	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
+	
+	int seq = 0;
+	if(label){
+		int labelLen = strlen(label);
+		
+		if( (label[0] == '\"' && label[labelLen - 1] == '\"') || (label[0] == '\'' && label[labelLen - 1] == '\'') ){
+			memcpy(strLabel,label + 1, labelLen - 2);
+			strLabel[labelLen - 2] = 0;
+		}
+		else{
+			strcpy(strLabel,label);
+		}
+		
+		seq = 0;
+		strcpy(tag[seq],strLabel);
+		callback[seq] = ParseHdrDummy;
+		callbackTail[seq] = ParseLogTail;
+		memcpy(replace[seq],"\x00\x00\x00\x00",4);
+		type[seq] = TPYE_UTF8STRING;
+		strcpy(format[seq++],"%s");
+		
+		ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
+	}
+	
+	return 0;
+}
+
+
 
 int DeleteUser(char * username){
 	
@@ -1290,41 +1468,47 @@ int DeleteUser(char * username){
 	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
-	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
 	char replace[SEARCH_ITEM_LIMIT][256];
 	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	callbackTail[seq] = ParseLogTail;
 	memcpy(replace[seq],"\x00\x00\x00\x00",4);
 	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-LOGOUT: Exec session is terminated for user %s on line ");
 	
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	callbackTail[seq] = ParseLogTail;
 	memcpy(replace[seq],"\x00\x00\x00\x00",4);
 	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-LOGIN_SUCCESS: Login successful for user %s on line ");
 	
 	strcpy(tag[seq],username);
 	callback[seq] = ParseLogHeader;
+	callbackTail[seq] = ParseLogTail;
 	memcpy(replace[seq],"\x00\x00\x00\x00",4);
 	type[seq] = TPYE_UTF8STRING;
 	strcpy(format[seq++],"-CONCURRENT_LOGIN: User %s has ");
 	
-	ret = deleteLog(format,seq,tag,callback,replace,type);
+	ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	
 	return ret;
 }
 
 
-int ParseDummy(char * data,char * begin,unsigned long * value){
+int ParseHdrDummy(char * data,char * begin,unsigned long * value){
 	value[0] =(unsigned long) data;
 	return 1;
 }
 
-
+int ParseTailDummy(char * data,char * begin,unsigned long * value){
+	return 0;
+}
 
 int ReplaceMem(char * strParam){
 	int ret = 0;
@@ -1360,18 +1544,20 @@ int ReplaceMem(char * strParam){
 	char tag[SEARCH_ITEM_LIMIT][256];
 	
 	char format[SEARCH_ITEM_LIMIT][256];
-	GetStringHdr_cb callback[SEARCH_ITEM_LIMIT];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
 	char replace[SEARCH_ITEM_LIMIT][256];
 	
 	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
 	
 	int seq = 0;
 	memcpy(tag[seq],&label,sizeof(int));
-	callback[seq] = ParseDummy;
+	callback[seq] = ParseHdrDummy;
+	callbackTail[seq] = 0;
 	strcpy(format[seq],"");
 	type[seq] = TYPE_INT;
 	memcpy(replace[seq++],&data,sizeof(int));
 	
-	ret = deleteLog(format,seq,tag,callback,replace,type);
+	ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	return ret;
 }

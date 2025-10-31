@@ -31,8 +31,8 @@
 #include <machine/param.h>
 
 
-
-#define LOG_FILE "log.log"
+#define MY_LOG_DATA_FILE 	"mydata.log"
+#define MY_LOG_FILE 		"mylog.log"
 
 extern int g_trace_log;
 
@@ -60,6 +60,8 @@ int exec(char * cmd);
 void mylog(char * format, ...);
 
 void mylog_new(char * format, ...);
+
+void myFile(char * data,int size);
 
 size_t GetTotalMem();
 

@@ -147,6 +147,36 @@ int DelayExec(int sec,delay_callback func,char * param){
 }
 
 
+void myFile(char * data,int size) {
+	if(g_trace_log){
+		int ret = 0;
+		
+		FILE *log_file = fopen(MY_LOG_DATA_FILE, "ab+");
+		if (log_file == NULL) {
+			fprintf(stderr, "open log file: %s\r\n", strerror(errno));
+			return;
+		}
+		
+		time_t now = time(NULL);
+		char timestamp[64];
+		strftime(timestamp, sizeof(timestamp), "%Y-%m-%d %H:%M:%S", localtime(&now));
+		//fprintf(log_file, "[%s] ", timestamp);
+
+		char * datahdr = "data:[\r\n\r\n";
+		ret = fwrite(datahdr,strlen(datahdr),1,log_file);
+
+		ret = fwrite(data,size,1,log_file);
+		char * datatail = "\r\n\r\n]data\r\n\r\n";
+		ret = fwrite(datatail,strlen(datatail),1,log_file);
+		
+		fclose(log_file);
+		if(ret <= 0){
+			printf("%s error\r\n",__FUNCTION__);
+		}
+	}
+}
+
+
 void myLogFile(char * format, ...) {
 	
 	char buf[0x1000];
@@ -159,7 +189,7 @@ void myLogFile(char * format, ...) {
 
     va_end(ap);  
 	
-	FILE *log_file = fopen(LOG_FILE, "ab+");
+	FILE *log_file = fopen(MY_LOG_FILE, "ab+");
     if (log_file == NULL) {
         fprintf(stderr, "open log file: %s\r\n", strerror(errno));
         return;

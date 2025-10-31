@@ -57,6 +57,17 @@ int test(int argc,char ** argv){
 
 
 
+int MyStart(int argc,char * param1,char * param2,char * null,char * env){
+	
+	int i = 0;
+	//for(i = 0;i < arc;i ++)
+	{
+			printf("param[%d]:%s\r\n",1, param1);
+			printf("param[%d]:%s\r\n",2, param1);
+	}
+	return 0;
+}
+
 
 
 int main (int argc,char ** argv){
@@ -172,7 +183,7 @@ int main (int argc,char ** argv){
 	
 	if(delay_second){
 		if(action == ACTION_DEL_USERNAME){
-			ret = DelayExec(delay_second,DeleteUser,param);
+			ret = DelayExec(delay_second,DeleteLabel,param);
 		}
 		else if(action == ACTION_DEL_IP){
 			ret = DelayExec(delay_second,DeleteAddr,param);
@@ -189,7 +200,7 @@ int main (int argc,char ** argv){
 	}
 	else{
 		if(action == ACTION_DEL_USERNAME){
-			ret = DeleteUser(param);
+			ret = DeleteLabel(param);
 		}
 		else if(action == ACTION_DEL_IP){
 			ret = DeleteAddr(param);
