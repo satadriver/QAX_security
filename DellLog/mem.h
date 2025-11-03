@@ -51,6 +51,10 @@ struct LoggingData{
 };
 
 
+//command-history logging is 200 bytes size block which ends with \r\n\0，including prefix:"\t- repeated n times\r\n"
+
+
+
 typedef int (*GetStringLabel)(char*, char*,char ** );
 
 int DeleteUser(char * username);

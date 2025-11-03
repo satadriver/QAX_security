@@ -251,7 +251,7 @@ int IsLogHdr(char * c){
 	{
 		if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
 		{
-			if( (c[4] >= '0' && c[4] <= '9') && (c[5] >= '0' && c[5] <= '9') &&
+			if( ( (c[4] >= '0' && c[4] <= '9') || (c[4] == ' ') )  && (c[5] >= '0' && c[5] <= '9') &&
 			(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
 			(c[10] >= '0' && c[10] <= '9') && (c[11] >= '0' && c[11] <= '9') &&
 			(c[13] >= '0' && c[13] <= '9') && (c[14] >= '0' && c[14] <= '9') )
@@ -367,13 +367,13 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 			if( (*(unsigned int*)(data + 1) == 0xedbeedfe) || (*(data+1) == 0 ) )
 			{
 				*lpnexthdr = data + 1;
-				len = data -1 - buf;
+				len = data +1 - buf;
 				return len;
 					
 				ret = IsLogHdr(data + 9);
 				if(ret){
 					*lpnexthdr = data + 1;
-					len = data -1 - buf;
+					len = data +1 - buf;
 					return len;
 				}
 			}
@@ -393,7 +393,7 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 }
 
 
-int ParseLogHeader(char * data,char * begin,char ** value)
+int ParseLogHeader_old(char * data,char * begin,char ** value)
 {
 	int size = 0;
 	int ret = 0;
@@ -443,27 +443,43 @@ int ParseLogHeader(char * data,char * begin,char ** value)
 	return 0;
 }
 
-
-int GetLogBody(char * data,char * begin,char * end,char **hdr,GetStringLabel* hdrCallback,GetStringLabel*tailCallback){
+int ParseLogHeader(char * data,char * begin,char ** value)
+{
+	int size = 0;
 	int ret = 0;
 	
-	ret = ParseLogHeader(data,begin,hdr);
-	if(ret){
-		char * nextline = 0;
-		ret = ParseLogTail(data,end,&nextline);
-		if(nextline){
-			return nextline - *hdr;
+	while(data >= begin){
+		
+		if(*data == '\n' || *data == 0|| *data == '\r'){
+			break;
+		}
+		else if(*data < 0x20 || *data >= 0x7f){
+			break;
+		}
+		
+		ret = IsLogHdr(data);
+		if(ret)
+		{
+			value[0] = data;
+			return 1;
+		}
+		
+		data --;
+
+		if(size++ >=256){
+			break;
 		}
 	}
-	
+		
 	return 0;
 }
+
 
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
 int ParseCommandHistoryHeader(char * data,char * begin,char ** value)
 {
 	int size = 0;
-	int tag = 0;
+
 	while(data >= begin){
 		
 		if(*data == 0 || *data == '\n' || *data == '\r')
@@ -480,10 +496,9 @@ int ParseCommandHistoryHeader(char * data,char * begin,char ** value)
 			int monthNum = GetMonthNum(c+1);
 			if(monthNum >= 0)
 			{
-				if( c[4] == ' '&& c[7] == ' '&& c[10] == ':'&& c[13] == ':' && c[16] == ']' )
+				if( c[0] == '[' && c[4] == ' '&& c[7] == ' '&& c[10] == ':'&& c[13] == ':' && c[16] == ']' )
 				{
-					if( (c[1] >= 'A' && c[1] <= 'Z') && (c[2] >= 'a' && c[2] <= 'z') && (c[3] >= 'a' && c[3] <= 'z' ) &&
-					(c[5] >= '0' && c[5] <= '9') && (c[6] >= '0' && c[6] <= '9') &&
+					if(  ( (c[5] >= '0' && c[5] <= '9') || (c[5] == ' ') ) && (c[6] >= '0' && c[6] <= '9') &&
 					(c[8] >= '0' && c[8] <= '9') && (c[9] >= '0' && c[9] <= '9') &&
 					(c[11] >= '0' && c[11] <= '9') && (c[12] >= '0' && c[12] <= '9') &&
 					(c[14] >= '0' && c[14] <= '9') && (c[15] >= '0' && c[15] <= '9') )
@@ -491,13 +506,12 @@ int ParseCommandHistoryHeader(char * data,char * begin,char ** value)
 						//return c;
 						value[0] =  c;
 						return 1;
-						tag ++;
 					}
 				}
 			}
 		}
 		/*
-		else if(tag == 1 && MyMemCmp(data,"\t - Repeated ",13) == 0){
+		else if( MyMemCmp(data,"\t - Repeated ",13) == 0){
 			value[1] =data;
 			return 2;
 		}
@@ -974,13 +988,13 @@ int DeleteDateTime(char * strParam){
 	char startstr[256];
 	struct tm * tm_begin = localtime(&start);		//static variable
 	const char * startmon = GetMonthStr(tm_begin->tm_mon);
-	int startlen = sprintf(startstr,"%s %02d %02d:%02d:%02d",
+	int startlen = sprintf(startstr,"%s %2d %02d:%02d:%02d",
 	startmon,tm_begin->tm_mday,tm_begin->tm_hour,tm_begin->tm_min,tm_begin->tm_sec);
 	
 	struct tm * tm_end = localtime(&stop);
 	char endstr[256];
 	const char * endmon = GetMonthStr(tm_end->tm_mon);
-	int endlen = sprintf(endstr,"%s %02d %02d:%02d:%02d",
+	int endlen = sprintf(endstr,"%s %2d %02d:%02d:%02d",
 	endmon,tm_end->tm_mday,tm_end->tm_hour,tm_end->tm_min,tm_end->tm_sec);
 	
 	mylog("start:%s,end:%s\r\n",startstr,endstr);
@@ -1085,9 +1099,19 @@ int DeleteDateTime(char * strParam){
 										perror("mmap\r\n");
 										break;
 									}
-									else{								
-										memcpy((char*)mapaddr+hdrPageOffset,"\x00\x00\x00\x00",4);
-										//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+									else{
+										char * nexthdr = 0;
+										int logLen = ParseLogTail(c,data + rlen,&nexthdr);
+										if(logLen && nexthdr)
+										{
+											unsigned long phyNextLogHdr = total + (nexthdr -  data);
+											unsigned long nextHdrAlignOffset = (unsigned long)phyNextLogHdr & pagemask;
+											unsigned long nextHdrPageOffset = phyNextLogHdr - nextHdrAlignOffset;
+											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen+2);
+										}
+										else{
+											
+										}
 									}
 									
 									num ++;
@@ -1264,7 +1288,7 @@ GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_
 								
 								//mylog_new("Find target string at file offset:%x,log header:%s\r\n",phyLogHdr,loghdr);
 								
-								myFile(loghdr-0x100,2048);
+								myFile(loghdr-0x1000,0x1000);
 								
 								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
 								if(mapaddr == MAP_FAILED){
@@ -1288,7 +1312,7 @@ GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_
 												unsigned long nextHdrPageOffset = phyNextLogHdr - nextHdrAlignOffset;
 												
 												//memcpy((char*)mapaddr+hdrPageOffset,(char*)mapaddr+nextHdrPageOffset,logLen);
-												memset((char*)mapaddr+hdrPageOffset,0x0d,logLen+2);
+												memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
 											}
 											else{
 												
@@ -1404,12 +1428,17 @@ int DeleteAddr(char * ip){
 		seq = 0;
 		strcpy(tag[seq],ip);
 		callback[seq] = ParseLogHeader;
-		callbackTail[seq] = 0;
+		callbackTail[seq] = ParseLogTail;
 		memcpy(replace[seq],"\x00\x00\x00\x00",4);
 		type[seq] = TPYE_UTF8STRING;
 		strcpy(format[seq++]," ( %s )");
 		
-		//strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
+		strcpy(tag[seq],ip);
+		callback[seq] = ParseLogHeader;
+		callbackTail[seq] = ParseLogTail;
+		memcpy(replace[seq],"\x00\x00\x00\x00",4);
+		type[seq] = TPYE_UTF8STRING;
+		strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
 		
 		ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	}
