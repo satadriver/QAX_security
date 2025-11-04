@@ -344,7 +344,24 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 		return 0;
 	}
 	
-	if(*(unsigned int*)(buf - 8) != 0xedbeedfe){
+	int tag = 0;
+	
+	if(*(unsigned int*)(buf - 8) == 0xedbeedfe){
+		tag = 1;
+	}
+	else if( (*(buf - 200) == '[' || *(buf - 200) == 0x09 ||*(buf - 200) == 0x0a ) && 
+	*(buf - 200 -1) == 0 && 
+	(*(buf - 200 -2) == 0x0a || *(buf - 200 -2) == 0x0d)&& 
+	*(buf - 200 -3) == 0x0d ){
+		tag = 2;
+	}
+	else if( (*(buf + 200) == '[' || *(buf + 200) == 0x09 ||*(buf + 200) == 0x0a ) && 
+	*(buf + 200 -1) == 0 && 
+	(*(buf + 200 -2) == 0x0a || *(buf + 200 -2) == 0x0d) && 
+	*(buf + 200 -3) == 0x0d){
+		tag = 2;
+	}
+	else{
 		return 0;
 	}
 	
@@ -362,12 +379,21 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 		}
 		
 		char cc = * data ++;
-		if( cc == 0x0d && (*data == 0x0a)  ){
+		if( (cc == 0x0d && *data == 0x0a )  || (cc == 0x0d && *data == 0x0d) ){
 			
 			if( (*(unsigned int*)(data + 1) == 0xedbeedfe) || (*(data+1) == 0 ) )
 			{
 				*lpnexthdr = data + 1;
-				len = data +1 - buf;
+				if(tag == 1){
+					len = data +1 - buf;
+				}
+				else if(tag == 2){
+					len = 200 - 1;
+					if( MyMemCmp(buf - 200,"\t - Repeated ",13) == 0){
+						len |= 0x80000000;
+					}
+				}
+				
 				return len;
 					
 				ret = IsLogHdr(data + 9);
@@ -1279,60 +1305,80 @@ GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_
 						char* loghdr = 0;
 						result = getStrHdr[seq](data + findPos,data + oldPos,&loghdr);
 						if(result){
-
-								unsigned long phyLogHdr =  total + (loghdr -  data);
-								
-								unsigned long hdrAlignOffset = phyLogHdr & pagemask;
-								
-								unsigned long hdrPageOffset = phyLogHdr - hdrAlignOffset;
-								
-								//mylog_new("Find target string at file offset:%x,log header:%s\r\n",phyLogHdr,loghdr);
-								
-								myFile(loghdr-0x1000,0x1000);
-								
-								void *mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
-								if(mapaddr == MAP_FAILED){
-									perror("mmap\r\n");
-									break;
-								}
-								else{
-									if(type[seq] == TPYE_UTF8STRING ){
-										if(getStrTail[seq]){
-											char * nexthdr = 0;
-											//int logLen = getStrTail[seq](data+findPos,data + rlen,&nexthdr);
-											int logLen = getStrTail[seq](loghdr,data + rlen,&nexthdr);
-											if(logLen && nexthdr)
-											{
-												unsigned long phyNextLogHdr = total + (nexthdr -  data);
-												//memcpy(phyLogHdr,phyNextLogHdr,logLen);
-												//*(char*)(phyLogHdr + logLen) = 0;
-												
-												unsigned long nextHdrAlignOffset = (unsigned long)phyNextLogHdr & pagemask;
-												
-												unsigned long nextHdrPageOffset = phyNextLogHdr - nextHdrAlignOffset;
-												
-												//memcpy((char*)mapaddr+hdrPageOffset,(char*)mapaddr+nextHdrPageOffset,logLen);
-												memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
+							//mylog_new("Find target string at file offset:%x,log header:%s\r\n",phyLogHdr,loghdr);
+							
+							myFile(loghdr-0x1000,0x1000);
+							void * mapaddr = 0;
+							unsigned long phyLogHdr = 0;
+							unsigned long hdrAlignOffset = 0;
+							unsigned long hdrPageOffset = 0;
+							if(type[seq] == TPYE_UTF8STRING ){
+								if(getStrTail[seq]){
+									char * nexthdr = 0;
+									int logLen = getStrTail[seq](loghdr,data + rlen,&nexthdr);
+									if(logLen && nexthdr)
+									{
+										if(logLen & 0x80000000)
+										{
+											logLen = logLen & 0x7fffffff;
+									
+											phyLogHdr =  total + (loghdr - 200 -  data);
+											hdrAlignOffset = phyLogHdr & pagemask;
+											hdrPageOffset = phyLogHdr - hdrAlignOffset;
+											
+											mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+											if(mapaddr == 0){
+												break;
 											}
-											else{
-												
-											}
+											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
+											
+											phyLogHdr =  total + (loghdr -  data);
+											hdrAlignOffset = phyLogHdr & pagemask;
+											hdrPageOffset = phyLogHdr - hdrAlignOffset;
+											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
 										}
 										else{
-											memcpy((char*)mapaddr+hdrPageOffset,replace[seq],4);
+											phyLogHdr =  total + (loghdr -  data);
+											hdrAlignOffset = phyLogHdr & pagemask;
+											hdrPageOffset = phyLogHdr - hdrAlignOffset;
+											mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+											if(mapaddr == 0){
+												break;
+											}
+											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
 										}
 									}
-									else if(type[seq] == TYPE_INT){
-										memcpy((char*)mapaddr+hdrPageOffset,replace[seq],sizeof(int));
+									else{
+										
 									}
-									//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
 								}
-								
-								num ++;
-								munmap(mapaddr, pagesize);
-								
-								//mylog_new("find target number:%8d\r\n",num);
+								else{
+									phyLogHdr =  total + (loghdr -  data);
+									hdrAlignOffset = phyLogHdr & pagemask;
+									hdrPageOffset = phyLogHdr - hdrAlignOffset;
+									mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+									if(mapaddr == 0){
+										break;
+									}
+									memcpy((char*)mapaddr+hdrPageOffset,replace[seq],4);
+								}
+							}
+							else if(type[seq] == TYPE_INT){
+								phyLogHdr =  total + (loghdr -  data);
+								hdrAlignOffset = phyLogHdr & pagemask;
+								hdrPageOffset = phyLogHdr - hdrAlignOffset;
+								mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+								if(mapaddr == 0){
+									break;
+								}
+								memcpy((char*)mapaddr+hdrPageOffset,replace[seq],sizeof(int));
+							}
+							//mylog("new address:%x,new string:%s\r\n",mapaddr+hdrPageOffset, mapaddr+hdrPageOffset);
+
+							num ++;
+							munmap(mapaddr, pagesize);
 							
+							//mylog_new("find target number:%8d\r\n",num);
 						}
 						else{
 							//mylog("Not find target string header at file offset:%x,value:%s\r\n",total + idx,data + idx);
@@ -1439,6 +1485,13 @@ int DeleteAddr(char * ip){
 		memcpy(replace[seq],"\x00\x00\x00\x00",4);
 		type[seq] = TPYE_UTF8STRING;
 		strcpy(format[seq++],"-CONNECTION: Disconnected from %s\n");
+		
+		strcpy(tag[seq],ip);
+		callback[seq] = ParseLogHeader;
+		callbackTail[seq] = ParseLogTail;
+		memcpy(replace[seq],"\x00\x00\x00\x00",4);
+		type[seq] = TPYE_UTF8STRING;
+		strcpy(format[seq++],"-CONNECTION: Connection closed by %s");
 		
 		ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
 	}
