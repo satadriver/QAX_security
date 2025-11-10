@@ -249,7 +249,7 @@ int IsLogHdr(char * c){
 	int monthNum = GetMonthNum(c);
 	if(monthNum >= 0)
 	{
-		if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' && c[15] == ' ' )
+		if( c[3] == ' '&& c[6] == ' '&& c[9] == ':'&& c[12] == ':' /*&& c[15] == ' '*/ )
 		{
 			if( ( (c[4] >= '0' && c[4] <= '9') || (c[4] == ' ') )  && (c[5] >= '0' && c[5] <= '9') &&
 			(c[7] >= '0' && c[7] <= '9') && (c[8] >= '0' && c[8] <= '9') &&
@@ -338,6 +338,11 @@ int ParseLogTail_old(char * buf,char * end,char ** lpnexthdr)
 	return 0;
 }
 
+
+
+
+
+
 int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 {
 	if(lpnexthdr == 0 ){
@@ -347,19 +352,6 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 	int tag = 0;
 	
 	if(*(unsigned int*)(buf - 8) == 0xedbeedfe){
-		tag = 1;
-	}
-	else if( (*(buf - 200) == '[' || *(buf - 200) == 0x09 ||*(buf - 200) == 0x0a ) && 
-	*(buf - 200 -1) == 0 && 
-	(*(buf - 200 -2) == 0x0a || *(buf - 200 -2) == 0x0d)&& 
-	*(buf - 200 -3) == 0x0d ){
-		tag = 2;
-	}
-	else if( (*(buf + 200) == '[' || *(buf + 200) == 0x09 ||*(buf + 200) == 0x0a ) && 
-	*(buf + 200 -1) == 0 && 
-	(*(buf + 200 -2) == 0x0a || *(buf + 200 -2) == 0x0d) && 
-	*(buf + 200 -3) == 0x0d){
-		tag = 2;
 	}
 	else{
 		return 0;
@@ -374,7 +366,7 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 	int num = 0;
 	int len = 0;
 	do{
-		if(total++ >= 40960){
+		if(total++ > 1024){
 			return 0;
 		}
 		
@@ -384,24 +376,81 @@ int ParseLogTail(char * buf,char * end,char ** lpnexthdr)
 			if( (*(unsigned int*)(data + 1) == 0xedbeedfe) || (*(data+1) == 0 ) )
 			{
 				*lpnexthdr = data + 1;
-				if(tag == 1){
-					len = data +1 - buf;
-				}
-				else if(tag == 2){
-					len = 200 - 1;
-					if( MyMemCmp(buf - 200,"\t - Repeated ",13) == 0){
-						len |= 0x80000000;
-					}
-				}
-				
+
+				len = data +1 - buf;
+
 				return len;
 					
-				ret = IsLogHdr(data + 9);
-				if(ret){
-					*lpnexthdr = data + 1;
-					len = data +1 - buf;
-					return len;
+			}
+			else{
+				break;
+			}
+		}
+		else if(cc >= 0x7f || cc < 0x20 ){
+			break;
+		}
+		else{
+			
+		}
+	}while(data < end);
+	
+	return 0;
+}
+
+
+
+int ParseCommandHistoryTail(char * buf,char * end,char ** lpnexthdr)
+{
+	if(lpnexthdr == 0 ){
+		return 0;
+	}
+	
+	if( (*(buf - 200) == '[' || *(buf - 200) == 0x09 ||*(buf - 200) == 0x0a ||*(buf - 200) == 0) && 
+	*(buf - 200 -1) == 0 && 
+	(*(buf - 200 -2) == 0x0a || *(buf - 200 -2) == 0x0d|| *(buf - 200 -2) == 0)&& 
+	(*(buf - 200 -3) == 0x0d || *(buf - 200 -3) == 0) ){
+
+	}
+	else if( (*(buf + 200) == '[' || *(buf + 200) == 0x09 ||*(buf + 200) == 0x0a ||*(buf + 200) == 0) && 
+	*(buf + 200 -1) == 0 && 
+	(*(buf + 200 -2) == 0x0a || *(buf + 200 -2) == 0x0d|| *(buf + 200 -2) == 0) && 
+	 (*(buf + 200 -3) == 0x0d || *(buf + 200 -3) == 0) ){
+
+	}
+	else{
+		return 0;
+	}
+	
+	*lpnexthdr = 0;
+	int ret = 0;
+
+	char * data = buf;
+	
+	int total = 0;
+	int num = 0;
+	int len = 0;
+	do{
+		if(total++ > 200){
+			return 0;
+		}
+		
+		char cc = * data ++;
+		if( (cc == 0x0d && *data == 0x0a )  || (cc == 0x0d && *data == 0x0d) ){
+			
+			if(  *(data+1) == 0  )
+			{
+				*lpnexthdr = data + 1;
+				
+				len = 200 - 1;
+				len |= 0x80000000;
+				if( MyMemCmp(buf - 200,"\t - Repeated ",13) == 0){
+					len |= 0x20000000;
 				}
+				else if( MyMemCmp(buf + 200,"\t - Repeated ",13) == 0){
+					len |= 0x40000000;
+				}
+
+				return len;
 			}
 			else{
 				break;
@@ -1318,24 +1367,50 @@ GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_
 									int logLen = getStrTail[seq](loghdr,data + rlen,&nexthdr);
 									if(logLen && nexthdr)
 									{
-										if(logLen & 0x80000000)
+										
+										if( (logLen & 0x80000000))
 										{
 											logLen = logLen & 0x7fffffff;
-									
-											phyLogHdr =  total + (loghdr - 200 -  data);
-											hdrAlignOffset = phyLogHdr & pagemask;
-											hdrPageOffset = phyLogHdr - hdrAlignOffset;
-											
-											mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
-											if(mapaddr == 0){
-												break;
+											if( (logLen & 0x40000000) || (logLen & 0x20000000))
+											{
+												
+												
+												int nextoffset = 0;
+												if(logLen & 0x40000000){
+													nextoffset = 0;
+													logLen = logLen & 0xbfffffff;
+												}
+												else{
+													nextoffset = -200;
+													logLen = logLen & 0xdfffffff;
+												}
+												
+										
+												phyLogHdr =  total + (loghdr + nextoffset -  data);
+												hdrAlignOffset = phyLogHdr & pagemask;
+												hdrPageOffset = phyLogHdr - hdrAlignOffset;
+												
+												mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+												if(mapaddr == 0){
+													break;
+												}
+												memset((char*)mapaddr+hdrPageOffset,0,logLen);
+												
+												phyLogHdr =  total + (loghdr + nextoffset + 200 -  data);
+												hdrAlignOffset = phyLogHdr & pagemask;
+												hdrPageOffset = phyLogHdr - hdrAlignOffset;
+												memset((char*)mapaddr+hdrPageOffset,0,logLen);
 											}
-											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
-											
-											phyLogHdr =  total + (loghdr -  data);
-											hdrAlignOffset = phyLogHdr & pagemask;
-											hdrPageOffset = phyLogHdr - hdrAlignOffset;
-											memset((char*)mapaddr+hdrPageOffset,0x0d,logLen);
+											else{
+												phyLogHdr =  total + (loghdr -  data);
+												hdrAlignOffset = phyLogHdr & pagemask;
+												hdrPageOffset = phyLogHdr - hdrAlignOffset;
+												mapaddr = mmap(NULL,pagesize*2, PROT_READ | PROT_WRITE,MAP_PRIVATE , fd, hdrAlignOffset);
+												if(mapaddr == 0){
+													break;
+												}
+												memset((char*)mapaddr+hdrPageOffset,0,logLen);
+											}
 										}
 										else{
 											phyLogHdr =  total + (loghdr -  data);
@@ -1425,7 +1500,7 @@ GetStringLabel *getStrTail,char replace[SEARCH_ITEM_LIMIT][256],int type[SEARCH_
 //[Oct 23 12:08:53]: CMD-(TEL17):[show packages system]by root from vty15
 //[Oct 22 19:30:50]: CMD-(SSH8):[show command-history]by admin from vty6 (172.16.0.203)
 //[Oct 22 13:53:28]: CMD-(SSH4):[show system brief]by admin from vty2 (172.16.0.203)
-int DeleteHistory(char * username){
+int DeleteHistory_old(char * username){
 	
 	int ret = 0;
 	
@@ -1500,7 +1575,53 @@ int DeleteAddr(char * ip){
 }
 
 
-
+int DeleteHistory(char * label){
+	int ret = 0;
+	char strLabel[1024];
+	
+	char tag[SEARCH_ITEM_LIMIT][256];
+	char format[SEARCH_ITEM_LIMIT][256];
+	GetStringLabel callback[SEARCH_ITEM_LIMIT];
+	char replace[SEARCH_ITEM_LIMIT][256];
+	int type[SEARCH_ITEM_LIMIT];
+	GetStringLabel callbackTail[SEARCH_ITEM_LIMIT];
+	
+	int seq = 0;
+	if(label){
+		int labelLen = strlen(label);
+		
+		if( (label[0] == '\"' && label[labelLen - 1] == '\"') || (label[0] == '\'' && label[labelLen - 1] == '\'') ){
+			memcpy(strLabel,label + 1, labelLen - 2);
+			strLabel[labelLen - 2] = 0;
+		}
+		else{
+			strcpy(strLabel,label);
+		}
+		
+		int strLabelLen = strlen(strLabel);
+		if( strLabel[0] != '[' || strLabel[strLabelLen - 1] != ']'){
+			printf("param error,example:[Nov 04 18:23:45]\r\n");
+			return -1;
+		}
+		ret = IsLogHdr(strLabel+1);
+		if(ret == 0){
+			printf("param error,example:[Nov 04 18:23:45]\r\n");
+			return -1;
+		}
+		
+		seq = 0;
+		strcpy(tag[seq],strLabel);
+		callback[seq] = ParseHdrDummy;
+		callbackTail[seq] = ParseCommandHistoryTail;
+		memcpy(replace[seq],"\x00\x00\x00\x00",4);
+		type[seq] = TPYE_UTF8STRING;
+		strcpy(format[seq++],"%s");
+		
+		ret = deleteLog(format,seq,tag,callback,callbackTail,replace,type);
+	}
+	
+	return 0;
+}
 
 
 
@@ -1525,6 +1646,12 @@ int DeleteLabel(char * label){
 		}
 		else{
 			strcpy(strLabel,label);
+		}
+		
+		ret = IsLogHdr(strLabel);
+		if(ret == 0){
+			printf("param error,example:Nov 04 18:23:45\r\n");
+			return -1;
 		}
 		
 		seq = 0;

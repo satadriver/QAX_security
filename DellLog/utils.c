@@ -23,12 +23,89 @@ int check_securelevel(void) {
 
 
 
-int isIPAddr(char * str){
-	uint32_t ip_num = inet_addr(str);
-	if(ip_num == INADDR_NONE){
+int isIPAddr(char * strparam){
+	int len = strlen(strparam);
+	char str[64];
+	if(len >= sizeof(str))
+	{
 		return 0;
 	}
-	return 1;
+	strcpy(str,strparam);
+	
+	uint32_t ip_num = inet_addr(str);
+	if(ip_num == INADDR_NONE || ip_num == 0xffffffff){
+		return 0;
+	}
+	
+	
+	
+	int i = 0;
+	int j = 0;
+	
+	for(i = 0,j = 0;i < len; ){
+		if( (str[i] >= '0' && str[i] <= '9') || str[i] == '.' )
+		{
+			str[j] = str[i];
+			j ++;
+			i ++;
+		}
+		else if(str[i] == ' '){
+			i ++;
+		}
+		else{
+			return 0;
+		}
+	}
+	str[j] = 0;
+	printf("remove space result:%s\r\n",str);
+	
+	len = strlen(str);
+	if(len > 16){
+		return 0;
+	}
+	
+	int cnt = 0;
+	char buf[4] = {0};
+	for( i = 0,j = 0;i < len;i ++){
+		if(str[i] >= '0' && str[i] <= '9'){
+			buf[j] = str[i];
+			j ++;
+			if( j >= 1 && j <= 3 )
+			{
+				if( (str[i +1] == '.' && cnt <= 2) || (str[i+1] == 0 && cnt == 3) ){
+					int seg = atoi(buf);
+					if(seg >= 0 && seg <= 255){
+						j = 0;
+						memset(buf,0,sizeof(buf));
+						cnt ++;
+						i ++;
+					}else{
+						return 0;
+					}
+				}
+				else if(j >= 3){
+					return 0;
+				}
+				else{
+
+				}
+			}
+			else if(j > 3){
+				return 0;
+			}
+			else{
+				return 0;
+			}
+		}
+		else{
+			break;
+		}
+	}
+	
+	if(cnt >= 3){
+		return 1;
+	}
+	return 0;
 }
 
 
