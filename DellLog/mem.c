@@ -1599,7 +1599,7 @@ int DeleteHistory(char * label){
 		}
 		
 		int strLabelLen = strlen(strLabel);
-		if( strLabel[0] != '[' || strLabel[strLabelLen - 1] != ']'){
+		if( strLabel[0] != '[' /*|| strLabel[strLabelLen - 1] != ']'*/){
 			printf("param error,example:[Nov 04 18:23:45]\r\n");
 			return -1;
 		}
