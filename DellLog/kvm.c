@@ -1,202 +1,389 @@
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <err.h>
+#include <errno.h>
+#include <nlist.h>
+#include <kvm.h>
 
-#include "kvm.h"
-
-//
-
-//#include <x86/pmap.h>
+#include <sys/mman.h>
+#include <sys/param.h>
+#include <sys/sysctl.h>
+#include <sys/proc.h>
+#include <sys/types.h>
 
 //#include <uvm/uvm_object.h>
+#include <uvm/uvm_extern.h>
+#include <uvm/uvm_map.h>
 
+#include <x86/pmap.h>
 
-struct uvm_object {
-	kmutex_t		vmobjlock;	/* lock on memq */
-	const struct uvm_pagerops *pgops;	/* pager ops */
-	struct pglist		memq;		/* pages in this object */
-	int			uo_npages;	/* # of pages in memq */
-	unsigned		uo_refs;	/* reference count */
-	struct rb_tree		rb_tree;	/* tree of pages */
-};
+#include "kvm.h"
+#include "utils.h"
 
-struct pmap {
-	struct uvm_object pm_obj[PTP_LEVELS-1]; /* objects for lvl >= 1) */
-#define	pm_lock	pm_obj[0].vmobjlock
-	LIST_ENTRY(pmap) pm_list;	/* list (lck by pm_list lock) */
-	pd_entry_t *pm_pdir;		/* VA of PD (lck by object lock) */
-#ifdef PAE
-	paddr_t pm_pdirpa[PDP_SIZE];
-#else
-	paddr_t pm_pdirpa;		/* PA of PD (read-only after create) */
-#endif
-	struct vm_page *pm_ptphint[PTP_LEVELS-1];
-					/* pointer to a PTP in our pmap */
-	struct pmap_statistics pm_stats;  /* pmap stats (lck by object lock) */
-
-#if !defined(__x86_64__)
-	vaddr_t pm_hiexec;		/* highest executable mapping */
-#endif /* !defined(__x86_64__) */
-	int pm_flags;			/* see below */
-
-	union descriptor *pm_ldt;	/* user-set LDT */
-	size_t pm_ldt_len;		/* size of LDT in bytes */
-	int pm_ldt_sel;			/* LDT selector */
-	uint32_t pm_cpus;		/* mask of CPUs using pmap */
-	uint32_t pm_kernel_cpus;	/* mask of CPUs using kernel part
-					 of pmap */
-};
-
-int get_proc_by_pid_kvmprocs(pid_t pid, struct proc *proc_out) {
-    kvm_t *kd;
-    char errbuf[1024];
-    struct kinfo_proc2 *procs;
-    int nprocs, i;
-    
-    kd = kvm_openfiles(NULL, NULL, NULL, 0, errbuf);
-    if (kd == NULL) {
-        fprintf(stderr, "kvm_openfiles failed: %s\n", errbuf);
-        return -1;
-    }
-	
-	char readbuf[1024]={0};
-	int ret = kvm_read(kd,0x0807880C,readbuf,4);
-	if(ret){
-		fprintf(stderr, "value: %x\n", *(unsigned int*)readbuf);
-	}
-    
-    procs = kvm_getproc2(kd, KERN_PROC_ALL, 0, sizeof(struct kinfo_proc2), &nprocs);
-    if (procs == NULL) {
-        fprintf(stderr, "kvm_getproc2 failed: %s\n", kvm_geterr(kd));
-        kvm_close(kd);
-        return -1;
-    }
-    
-
-    for (i = 0; i < nprocs; i++) {
-        if (procs[i].p_pid == pid) {
-
-            printf("PID:%d,process:%s\r\n", procs[i].p_pid, procs[i].p_comm);
-            break;
-        }
-    }
-	
-	/*
-	int nvmes;
-	struct kinfo_vmentry *vmes;
-	vmes = kvm_getvmmap(kd, pid, &nvmes);
-    if (vmes == NULL) {
-        kvm_close(kd);
-        return 0;
-    }
-	*/
-    
-    //free(procs);
-    kvm_close(kd);
-    return (i < nprocs) ? 0 : -1;
-}
+#include "mem.h"
 
 
 
+#define PTP_LEVELS 2
 
 
-
-
-
-
-
-
-
-
+#define PAGE_MASK 0xfff
 
 
 
 /*
-struct nlist {
-    const char *n_name;  
-    uintptr_t   n_value; 
-    uint8_t     n_type;  
-    int8_t      n_desc;  
-    uint8_t     n_other; 
+/include/sys/queue.h
+#define	LIST_HEAD(name, type)			\
+struct name {							\
+	struct type *lh_first;				\
+}
+
+#define LIST_ENTRY(type) struct {                \
+    struct type *le_next;    \
+    struct type **le_prev;   \
+}
+
+/include/uvm/uvm_object.h
+struct uvm_object {
+	kmutex_t *		vmobjlock;			//4 4
+	const struct uvm_pagerops *pgops;	//4 8
+	struct pglist		memq;			//8 16
+	int			uo_npages;				//4 20
+	unsigned		uo_refs;			//4 24
+	struct rb_tree		rb_tree;		//16 			24+16=40 
+	LIST_HEAD(,ubc_map)	uo_ubc;			//4 			40+4=44 
 };
+
+/usr/include/uvm/uvm_pglist.h
+TAILQ_HEAD(pglist, vm_page);
+
+/usr/include/sys/queue.h
+#define	_TAILQ_HEAD(name, type, qual)		\
+struct name {								\
+	qual type *tqh_first;			\
+	qual type *qual *tqh_last;		\
+}
+#define TAILQ_HEAD(name, type)	_TAILQ_HEAD(name, struct type,)
+
+
+/usr/include/sys/rbtree.h
+
+typedef struct rb_tree {
+	struct rb_node *rbt_root;
+	const rb_tree_ops_t *rbt_ops;
+	struct rb_node *rbt_minmax[2];
+#ifdef RBDEBUG
+	struct rb_node_qh rbt_nodes;
+#endif
+#ifdef RBSTATS
+	unsigned int rbt_count;
+	unsigned int rbt_insertions;
+	unsigned int rbt_removals;
+	unsigned int rbt_insertion_rebalance_calls;
+	unsigned int rbt_insertion_rebalance_passes;
+	unsigned int rbt_removal_rebalance_calls;
+	unsigned int rbt_removal_rebalance_passes;
+#endif
+} rb_tree_t;
+
+*/
+	
+
+// /usr/include/sys/pmap.h
+struct pmap {
+    int pm_obj[11]; 
+   
+    int pm_obj_lock[1];
+    
+    unsigned int pm_list[2]; 
+    int pm_pdir; 
+
+    unsigned int pm_pdirpa[1]; 
+
+    int pm_ptphint[2];  
+    
+    int pm_stats[8]; 
+    
+#if !defined(__x86_64__)
+    int pm_hiexec; 
+#endif
+    
+    int pm_flags;   
+
+    int pm_ldt;
+    int pm_ldt_len;    
+    int pm_ldt_sel;    
+    
+    int pm_cpus;        
+    int pm_kernel_cpus;          
+    int pm_xen_ptp_cpus;         
+    
+    unsigned long long pm_ncsw;  
+    int pm_gc_ptp;       
+};
+
+
+
+/*
+/include/x86/rwlock.h
+
+struct krwlock {
+	volatile uintptr_t	rw_owner;
+};
+
+/include/x86/mutex.h
+struct kmutex {
+	union {
+		volatile uintptr_t	mtxa_owner;
+#ifdef __MUTEX_PRIVATE
+		struct {
+			volatile uint8_t	mtxs_dummy;
+			ipl_cookie_t		mtxs_ipl;
+                        __cpu_simple_lock_t	mtxs_lock;
+			volatile uint8_t	mtxs_unused;
+		} s;
+#endif
+	} u;
+};
+
+typedef struct kmutex kmutex_t;
+
+/include/sys/kcondvar.h
+typedef struct kcondvar {
+	void		*cv_opaque[3];
+} kcondvar_t;
+
 */
 
-struct nlist symbols[] = {
-    { "_allproc",0,0,0,0 },      
-    { "_nprocesses",0,0,0,0 },   
-    { NULL }
+
+// /usr/include/sys/proc.h
+struct proc {
+
+	LIST_ENTRY(proc) p_list;
+    int p_auxlock[1];                   /* kmutex_t - 8B */
+    int p_lock;                         /* kmutex_t* - 4B */
+    int p_stmutex[1];                   /* kmutex_t - 8B */
+    int p_reflock[1];                   /* krwlock_t - 8B */
+    int p_waitcv[3];                    /* kcondvar_t - 8B */
+    int p_lwpcv[3];                     /* kcondvar_t - 8B */
+
+    int p_cred;                         /* struct kauth_cred* */
+    int p_fd;                           /* struct filedesc* */
+    int p_cwdi;                         /* struct cwdinfo* */
+    int p_stats;                        /* struct pstats* */
+    int p_limit;                        /* struct plimit* */
+    int p_vmspace;                      /* struct vmspace* */
+    int p_sigacts;                      /* struct sigacts* */
+    int p_aio;                          /* struct aioproc* */
+    
+    int p_mqueue_cnt;                   /* u_int - 4B */
+    unsigned long long p_specdataref;   /* specificdata_reference - 8B */
+    
+    int p_exitsig;                      /* int */
+    int p_flag;                         /* int */
+    int p_sflag;                        /* int */
+    int p_slflag;                       /* int */
+    int p_lflag;                        /* int */
+    int p_stflag;                       /* int */
+    
+    char p_stat;                        /* char - 1B */
+    char p_trace_enabled;               /* char - 1B */
+    char p_pad1[2];                     /* char[2] - 2B */
+    
+    int p_pid;                          /* pid_t - 4B */
+    unsigned long long p_pglist[2];     /* LIST_ENTRY(proc) - 16B */
+    int p_pptr;                         /* struct proc* - 4B */
+    unsigned long long p_sibling[2];    /* LIST_ENTRY(proc) - 16B */
+    unsigned long long p_children[2];   /* LIST_HEAD(, proc) - 16B */
+    unsigned long long p_lwps[2];       /* LIST_HEAD(, lwp) - 16B */
+    int p_raslist;                      /* struct ras* - 4B */
+    
+    int p_nlwps;                        /* int */
+    int p_nzlwps;                       /* int */
+    int p_nrlwps;                       /* int */
+    int p_nlwpwait;                     /* int */
+    int p_ndlwps;                       /* int */
+    int p_nlwpid;                       /* int */
+    int p_nstopchild;                   /* u_int */
+    int p_waited;                       /* u_int */
+    int p_zomblwp;                      /* struct lwp* */
+    int p_vforklwp;                     /* struct lwp* */
+
+    int p_sched_info;                   /* void* */
+    int p_estcpu;                       /* fixpt_t */
+    int p_estcpu_inherited;             /* fixpt_t */
+    int p_forktime;                     /* unsigned int */
+    int p_pctcpu;                       /* fixpt_t */
+    int p_opptr;                        /* struct proc* */
+    int p_timers;                       /* struct ptimers* */
+    
+    unsigned long long p_rtime[2];      /* struct bintime - 16B */
+    unsigned long long p_uticks;        /* u_quad_t - 8B */
+    unsigned long long p_sticks;        /* u_quad_t - 8B */
+    unsigned long long p_iticks;        /* u_quad_t - 8B */
+    
+    int p_traceflag;                    /* int */
+    int p_tracep;                       /* void* */
+    int p_textvp;                       /* struct vnode* */
+    int p_emul;                         /* struct emul* */
+    int p_emuldata;                     /* void* */
+    int p_execsw;                       /* const struct execsw* */
+    unsigned long long p_klist[2];      /* struct klist - 16B */
+    
+    unsigned long long p_sigwaiters[2]; /* LIST_HEAD(, lwp) - 16B */
+    unsigned long long p_sigpend[2];    /* sigpend_t - 16B */
+    int p_lwpctl;                       /* struct lcproc* */
+    int p_ppid;                         /* pid_t */
+    int p_fpid;                         /* pid_t */
+    
+    unsigned long long p_sigctx[4];     /* struct sigctx - 32B */
+
+    char p_nice;                        /* u_char - 1B */
+    char p_comm[17];                    /* char[MAXCOMLEN+1] - 17B */
+    int p_pgrp;                         /* struct pgrp* - 4B */
+    int p_psstrp;                       /* vaddr_t - 4B */
+    int p_pax;                          /* u_int - 4B */
+    
+    short p_xstat;                      /* u_short - 2B */
+    short p_acflag;                     /* u_short - 2B */
+    
+    char p_md[32];                      /* struct mdproc - 32B */
+    int p_stackbase;                    /* vaddr_t - 4B */
+    int p_dtrace;                       /* struct kdtrace_proc* - 4B */
 };
 
 
 
-int find_proc_by_pid(pid_t target_pid, struct proc *proc_out) {
+
+
+
+
+
+
+int MemSearch(char * data,int size,char * tag,int tagLen){
 	
-    u_long allproc_addr;
-    struct proc *first_proc;
-    int found = 0;
-	
-	kvm_t *kd=0;
-    char errbuf[1024];  
-    kd = kvm_openfiles(NULL, NULL, NULL, 0, errbuf);
-    if (kvm_nlist(kd, symbols) == -1) {
-        fprintf(stderr, "kvm_nlist failed\n");
-        return -1;
-    }
-	
-	printf("name:%s,value:%x,type:%d,desc:%d,other:%d\r\n",symbols[0].n_name,symbols[0].n_value,symbols[0].n_type,symbols[0].n_desc,symbols[0].n_other);
+	int len = 0;
+	for(len = 0; len < size - tagLen ; len ++){
+		if(memcmp(data + len,tag,tagLen) == 0){
+			printf("find str:%s offset:%d\r\n",data + len,len);
+			return len;
+		}
+	}
+	return -1;
+}
+
+
+
+
+int access_physical_memory(unsigned long phys_addr, size_t len, void *user_buf, int flag) {
+    int fd = -1;
+    void *mapped_addr = MAP_FAILED;
+    int ret = -1;
+    unsigned long page_size = sysconf(_SC_PAGESIZE);
+    unsigned long page_mask = page_size - 1;
     
-    if (kvm_read(kd, symbols[0].n_value, &allproc_addr, sizeof(allproc_addr)) == -1) {
-        fprintf(stderr, "read allproc err:%s\n",kvm_geterr(kd));
+    if (len == 0) {
+        fprintf(stderr, "%s %d error:length 0\n",__FUNCTION__,__LINE__);
+        errno = EINVAL;
+        //goto out;
+    }
+    if (user_buf == NULL) {
+        fprintf(stderr, "%s %d error:buffer null\n",__FUNCTION__,__LINE__);
+        errno = EINVAL;
+        //goto out;
+    }
+
+    fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (fd < 0) {
+        printf("%s %d error:open/dev/mem",__FUNCTION__,__LINE__);
+        goto out;
+    }
+
+    unsigned long map_base = phys_addr & ~page_mask;
+    unsigned long map_offset = phys_addr & page_mask;
+    size_t map_len = (len + map_offset + 0xfff)&0xfffff000;
+	if(map_len == 0){
+		map_len = 0x1000;
+	}
+
+	int is_write = flag & 1;
+    mapped_addr = mmap(NULL, map_len, 
+                       is_write  ? (PROT_READ | PROT_WRITE) : PROT_READ,
+                       MAP_SHARED, fd, (off_t)map_base);
+
+    if (mapped_addr == MAP_FAILED) {
+        perror("mmap");
+        goto out;
+    }
+
+    void *access_ptr = (char *)mapped_addr + map_offset;
+    if (is_write) {
+
 		
-        return -1;
+		char * endstr = "\r\n";
+		if(flag & 2){
+			endstr = "\r\n";
+		}
+		else{
+			
+		}
+		printf("success: write address before 0x%lx value:%s 0x%x B\n", phys_addr, access_ptr,len);
+		int pos = MemSearch(access_ptr,len,endstr,strlen(endstr));
+		if(pos != -1){
+			/*
+			int dstlen = strlen(access_ptr);
+			int srclen = strlen(user_buf);
+			if(dstlen < srclen){
+				srclen = dstlen;
+			}
+				
+			
+			int cnt = dstlen / srclen;
+			char * dst = access_ptr;
+			char * src = user_buf;
+			int i = 0;
+			for (i = 0;i < cnt;i ++){
+				memcpy(dst, src, srclen);
+				dst += srclen;
+				src += srclen;
+			}
+			
+			int mod = dstlen % srclen;
+			if(mod){
+				memcpy(dst, src, mod);
+			}
+			*/
+			memcpy(access_ptr, user_buf, strlen(user_buf) );
+		}
+		
+        
+        //if (msync(mapped_addr, map_len, MS_SYNC) < 0) 
+		//{
+        //    perror("msync");
+        //}
+		
+        printf("success: write address after 0x%lx value:%s 0x%x B\n", phys_addr, access_ptr,len);
+    } else {
+        memcpy(user_buf, access_ptr, len);
+        //printf("success: read address 0x%lx 0x%x B\n", phys_addr, len);
     }
-    
 
-    if (kvm_read(kd, allproc_addr, &first_proc, sizeof(first_proc)) == -1) {
-        fprintf(stderr, "kvm_read failed:%s\n",kvm_geterr(kd));
-        return -1;
-    }
-    
-    printf("look forward PID=%d...\n", target_pid);
-    
+    ret = 0;
 
-    u_long current_addr = (u_long)first_proc;
-    int count = 0;
-    
-    while (current_addr != 0 && current_addr != allproc_addr && count < 1000) {
-        struct proc current_proc;
-        
-
-        if (kvm_read(kd, current_addr, &current_proc, sizeof(current_proc)) == -1) {
-            fprintf(stderr, "read proc struct error at 0x%lx\n", current_addr);
-            break;
-        }
-        
-        count++;
-        
-
-        if (current_proc.p_pid == target_pid) {
-            *proc_out = current_proc;
-            found = 1;
-            printf("find target process,count:%d\n", count);
-            break;
-        }
-        
-
-        if (current_proc.p_list.le_next == 0) {
-            break;
-        }
-        current_addr = (u_long)current_proc.p_list.le_next;
-        
-        if (current_addr == allproc_addr) {
-            break; 
+out:
+    if (mapped_addr != MAP_FAILED) {
+        if (munmap(mapped_addr, map_len) < 0) {
+            perror("munmap");
         }
     }
-    
-    if (!found) {
-        printf("not found PID:%d (get process:%d)\n", target_pid, count);
+    if (fd >= 0) {
+        close(fd);
     }
-    
-	kvm_close(kd);
-    return found ? 0 : -1;
+    return ret;
 }
 
 
@@ -205,276 +392,254 @@ int find_proc_by_pid(pid_t target_pid, struct proc *proc_out) {
 
 
 
-
-
-typedef uint32_t vm_offset_t;
-
-struct kinfo_vmentry {
-    vm_offset_t  vme_start;    
-    vm_offset_t  vme_end;      
-    vm_prot_t    vme_prot;     
-    vm_prot_t    vme_maxprot; 
-    int          vme_type;    
-    int          vme_state;   
-    pid_t        vme_pid;      
-    u_int        vme_npages;   
-    off_t        vme_offset;  
-    dev_t        vme_dev;    
-    ino_t        vme_ino;    
-    mode_t       vme_mode;     
-    char         vme_path[32]; 
-};
-
-
-int get_proc_vm_regions(pid_t pid) {
-
-#define CTL_UNSPEC   0    
-#define CTL_KERN     1    
-#define CTL_VM       2    
-#define CTL_NET      3    
-#define CTL_PROC     4   
-#define CTL_FS       5   
-#define CTL_DEBUG    6   
-#define CTL_DEV      7    
-#define CTL_USER     8    
-#define CTL_DDB      9    
-#define CTL_VFS      10  
-#define CTL_MAXID    11   
-
-#define KVME_PROT_EXEC    0x04    
-
-
-#define KERN_PROC_ALL        0   
-#define KERN_PROC_PID        1   
-#define KERN_PROC_PGRP       2   
-#define KERN_PROC_SESSION    3    
-#define KERN_PROC_TTY        4    
-#define KERN_PROC_UID        5    
-#define KERN_PROC_RUID       6    
-#define KERN_PROC_ARGS       7    
-#define KERN_PROC_CWD        8    
-#define KERN_PROC_NTHREADS   9    
-
-#define KERN_PROC_PATH       11  
-#define KERN_PROC_ARGLEN     12   
-#define KERN_PROC_KSTACK     13   
-#define KERN_PROC_SEGS       14   
-#define KERN_PROC_SV_NAME    15   
-
-
-#define KERN_PROC           35  
-#define KERN_PROC2          36  
-
-
-#define CTL_KERN          1
-#define KERN_PROC2       36
-#define KERN_PROC_VMMAP  40
+int CheckData(char * buffer,int size,char * addr,char * tag,int end,char * replace){
+	size_t memSize = GetTotalMem();
+	if(addr >= memSize || addr == 0){
+		return 0;
+	}
 	
-    int mib[] = { CTL_KERN, KERN_PROC2,KERN_PROC_VMMAP, pid ,sizeof(struct kinfo_vmentry),0};
-    size_t mib_len = sizeof(mib) / sizeof(mib[0]);
+	if(size < 0x4000 ){
+		//return 0;
+	}
+	int rwsize = 0;
+	//if(size >= 0x4000)
+	{
+		//myFile(buffer,size);
 
-    size_t buf_len=0;
-    if (sysctl(mib, mib_len, NULL, &buf_len, NULL, 0) == -1) {
-		
-		int error_code = errno;
-        const char *error_str = strerror(error_code);
-        
-        printf("sysctl failed with error %d: %s\n", error_code, error_str);
-		
-        return -1;
-    }
+		//char * tag = "how are you?";
+		//char * newtag = "this is a good day!";
+		//char newdata[0x100];
+		//strcpy(newdata,newtag);
+		int pos = MemSearch(buffer, size,tag,strlen(tag));
+		if(pos != -1){
+			int flag = 1;
+			if(end == 0){
+				flag |= 2;
+			}
+			
+			rwsize = access_physical_memory(addr+pos,(size_t)size - pos,replace,flag);
+		}
+	}
 
-    struct kinfo_vmentry *vm_entries = malloc(buf_len);
-    if (vm_entries == NULL) {
-        perror("malloc");
-        return -1;
-    }
-
-    if (sysctl(mib, mib_len, vm_entries, &buf_len, NULL, 0) == -1) {
-        perror("sysctl");
-        free(vm_entries);
-        return -1;
-    }
-
-
-    size_t nentries = buf_len / 80;
-    printf("process:%d memory(total:%d)\n", pid, nentries);
-	size_t i = 0;
-    for ( i = 0; i < nentries; i++) {
-        //struct kinfo_vmentry *entry = &vm_entries[i];
-		
-		unsigned int  *v = (unsigned int  *)&vm_entries[i];
-        printf(
-            "range: 0x%lx - 0x%lx | privilige: %c%c%c | type: %s\n",
-			v[0],
-            v[1],
-            (v[2] & KVME_PROT_READ) ? 'r' : '-',
-            (v[2] & KVME_PROT_WRITE) ? 'w' : '-',
-            (v[2] & KVME_PROT_EXEC) ? 'x' : '-',
-            v[12] 
-        );
-    }
-
-    free(vm_entries);
-    return 0;
+	return rwsize;
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#define PROC_LIST_ADDR 0xc0b82bf4
-
-#define vaddr_t unsigned long
-
-
-
-paddr_t virt_to_phys(kvm_t *kd, struct pmap *pmap, unsigned long vaddr) {
-    unsigned long pdir_pa;    
-    unsigned long pdir_entry; 
-    unsigned long ptab_pa;       
-    unsigned long ptab_entry;
-    vaddr_t pdir_idx, ptab_idx;
+paddr_t RWPageTable(kvm_t *kd, struct pmap *lppmap, char * tag,int end,char * replace) {
+    unsigned long pm_pdir[1024];    
+	unsigned long pm_pdirpa;
+	//printf("sizeof(struct pglist ):0x%x\r\n",sizeof(struct pglist ));
+	printf("PTP_LEVELS:0x%x\r\n",PTP_LEVELS);
+	printf("PDP_SIZE:0x%x\r\n",PDP_SIZE);
 	
-	struct pmap mypmap;
-	if (kvm_read(kd, (vaddr_t)pmap, &mypmap, sizeof(mypmap)) != sizeof(mypmap)) {
-        fprintf(stderr, "kvm_read mypmap failed: %s\n", kvm_geterr(kd));
+	int i = 0;
+	int k = 0;
+	int idx = 0;
+	
+	struct pmap stpmap={0};
+	if (kvm_read(kd, (vaddr_t)lppmap, &stpmap, sizeof(struct pmap)) !=  sizeof(struct pmap)) {
+        fprintf(stderr, "kvm_read struct pmap failed: %s\n", kvm_geterr(kd));
         kvm_close(kd);
         return 1;
     }
-	fprintf(stderr, "read pm_pdirpa: %x\n", mypmap.pm_pdir);
 	
-    if (kvm_read(kd, mypmap.pm_pdir, &pdir_pa, sizeof(pdir_pa)) != sizeof(pdir_pa)) 
+	unsigned int cr3 = 0;
+	
+	char * data = (char*)&stpmap;
+	for ( i = 0;i < sizeof(struct pmap);i += 4){
+		if(i == 0x3c){
+			cr3 = *(unsigned int*)(data+i);
+			printf("cr3:0x%x,addr:%x\r\n",cr3,data+i);
+		}
+		printf("%d\t%08x\r\n", i/4,*(unsigned int*)(data+i));
+	}
+	
+	unsigned int temp =  stpmap.pm_pdirpa;
+	printf("pm_pdirpa:0x%x\r\n",temp);
+	
+	fprintf(stderr,"pm_pdirpa:0x%x,offset:0x%x,addr:%x\r\n",stpmap.pm_pdirpa,offsetof(struct pmap, pm_pdirpa),&(stpmap.pm_pdirpa));
+
+	fprintf(stderr, "pm_pdir: 0x%x,offset:0x%x,pm_pdirpa: 0x%x,offset:0x%x\n", stpmap.pm_pdir,offsetof(struct pmap, pm_pdir),stpmap.pm_pdirpa,offsetof(struct pmap, pm_pdirpa));
+	
+    if (kvm_read(kd, stpmap.pm_pdir, &pm_pdir, sizeof(pm_pdir)) != sizeof(pm_pdir)) 
 	{
-		fprintf(stderr, "read pm_pdir: %s\n", kvm_geterr(kd));
+		fprintf(stderr, "kvm_read pm_pdir error: %s\n", kvm_geterr(kd));
         return 0;
     }
-	fprintf(stderr, "read pm_pdir: %x\n", pdir_pa);
 	
-	int cr3[1024];
-	if(kvm_read(kd, pdir_pa, cr3, sizeof(cr3)) != sizeof(cr3)){
-		fprintf(stderr, "read cr3: %s\n", kvm_geterr(kd));
-		return -1;
-	}
-	int k = 0;
+	
+	
+	int readsize = 0;
+	
+	char * buffer = malloc(FILE_BUFFER_SIZE);
+	data = buffer;
+	char * addr = 0;
+	int pts[1024];
 	for( k = 0;k < 1024;k ++){
-		if(k % 0x100 == 0){
-			printf("address:%x,value:%x\r\n",cr3+k,cr3[k]);
+		if(pm_pdir[k]){
+			unsigned long pt = pm_pdir[k] & 0xfffff000;
+			//printf("number:%d pt:0x%x\r\n",k,pt);
+			
+			readsize = access_physical_memory(pt,0x1000,pts,0);
+			if(readsize){
+				fprintf(stderr, "access_physical_memory page table:0x%x error: %s\n", pt,kvm_geterr(kd));
+				//break;
+			}
+			else{
+				
+				for(idx = 0;idx < 1024;idx ++){
+					unsigned long p = pts[idx] & 0xfffff000;
+					if(pts[idx]){
+						//printf("number:%d ptd:0x%x,page:%x\r\n",idx,pt,p);
+
+						readsize = access_physical_memory(p,0x1000,data,0);
+						if(readsize){
+							fprintf(stderr, "access_physical_memory page table:0x%x error: %s\n", pt,kvm_geterr(kd));
+							//break;
+						}
+						else{
+							CheckData(data,0x1000,p,tag,end,replace);
+							/*
+							if(addr == 0){
+								printf("[%d]:p:0x%x,addr:%x,size:%x\r\n",idx,p,addr,data - buffer);
+								addr = (char*) p;
+								data+= 0x1000;
+								
+								continue;
+							}
+							else if(addr && ((char*)p - addr == 0x1000) ){
+								printf("[%d]:p:0x%x,addr:%x,size:%x\r\n",idx,p,addr,data - buffer);
+								
+								data+= 0x1000;
+
+								addr = (char*) p;
+								continue;
+							}
+							else{
+								printf("[%d]:p:0x%x,addr:%x,size:%x\r\n",idx,p,addr,data - buffer);
+								
+								int size = data - buffer;
+
+								CheckData(buffer,size,addr);
+								
+								addr = 0;
+								data = buffer;
+							}
+							*/
+							
+						}
+					}
+				}
+				//printf("[%d]:p:0x%x,addr:%x,size:%x\r\n",idx,p,addr,p - (unsigned long)addr);
+				//int size = data - buffer;
+				//CheckData(buffer,size,addr);
+			}
+			//printf("[%d]:p:0x%x,addr:%x,size:%x\r\n",idx,p,addr,p - (unsigned long)addr);
+			//int size = data - buffer;
+			//CheckData(buffer,size,addr);
 		}
 	}
-	
-	printf("%s ok\r\n",__FUNCTION__);
 
-    pdir_idx = (vaddr >> 22) & 0x3ff;  
-    ptab_idx = (vaddr >> 12) & 0x3ff; 
-
-
-    if (kvm_read(kd, pdir_pa + pdir_idx * sizeof(pdir_entry), &pdir_entry, sizeof(pdir_entry)) != sizeof(pdir_entry)) {
-		fprintf(stderr, "read pdir_pa: %s\n", kvm_geterr(kd));
-        return 0;
-    }
-    if (!(pdir_entry)) { 
-		fprintf(stderr, "read pdir_entry: %s\n", kvm_geterr(kd));
-        return 0;
-    }
-
-    ptab_pa = (pdir_entry & 0xfffff000);  
-    if (kvm_read(kd, ptab_pa + ptab_idx * sizeof(ptab_entry), &ptab_entry, sizeof(ptab_entry)) != sizeof(ptab_entry)) {
-		fprintf(stderr, "read ptab_pa: %s\n", kvm_geterr(kd));
-        return 0;
-    }
-    if (!(ptab_entry)) {  
-		fprintf(stderr, "read ptab_entry: %s\n", kvm_geterr(kd));
-        return 0;
-    }
-
-    unsigned long addr = (ptab_entry & 0xfffff000) | (vaddr & PAGE_MASK);
-	
-	char data[0x100]= {0};
-	
-	if(kvm_read(kd, addr, data, sizeof(data)) != sizeof(data)){
-		fprintf(stderr, "read data: %s\n", kvm_geterr(kd));
+	readsize = access_physical_memory(cr3,0x1000,pts,0);
+	if(readsize){
+		fprintf(stderr, "access_physical_memory page table:0x%x error: %s\n", cr3,kvm_geterr(kd));
+	}
+	else{
+		for ( i = 0;i < 1024;i++){
+			if(pts[i]){
+				//printf("cr3 %d\t%08x\r\n", i,pts[i]);
+			}
+		}	
 	}
 	
-	printf("read data:%s\r\n",data);
-	return addr;
-	
+	//getchar();
+
+	return 0;
 }
 
 
 
+#include <sys/sysctl.h>
 
+int RWProcData(pid_t target_pid,char * tag,int end,char * replace) {
 
-int writeProcesData(pid_t target_pid, char *vaddr,char * value) {
-
-    vaddr_t target_vaddr = (vaddr_t)vaddr;
-    unsigned long new_value = (unsigned long)value;
-    char errbuf[1024];
+	g_trace_log = 1;
 	
-	target_pid = getpid();
-
-
+    char errbuf[1024];
+	char * data = 0;
+	int i = 0;
+	
     kvm_t *kd = kvm_open(NULL, NULL, NULL, O_RDWR, errbuf);
     if (kd == NULL) {
         fprintf(stderr, "kvm_open failed: %s\n", errbuf);
-        return 1;
+        return 0;
     }
+	
+	int cnt;
+    struct kinfo_proc *procs;
+	procs = kvm_getprocs(kd, KERN_PROC_ALL, 0, &cnt);
+	for ( i = 0; i < cnt; i++) {
 
-    struct proc *proc_list, *target_proc = NULL;
-    if (kvm_read(kd, PROC_LIST_ADDR, &proc_list, sizeof(proc_list)) != sizeof(proc_list)) {
-        fprintf(stderr, "read PROC_LIST_ADDR: %s\n", kvm_geterr(kd));
-        kvm_close(kd);
-        return 1;
+        //printf("%d\t%s\n", procs[i].p_pid, procs[i].p_comm);
     }
+	
+    struct nlist nl[] = {
+        { .n_name = "_allproc" }, 
+        { .n_name = NULL }
+    };
+    
+    if (kvm_nlist(kd, nl) < 0 || nl[0].n_value == 0) {
+        fprintf(stderr, "kvm_nlist error: %s\n", kvm_geterr(kd));
+        kvm_close(kd);
+        return 0;
+    }
+    
+    vaddr_t proc_list_head_addr = nl[0].n_value;
+    printf("struct proc list address: 0x%lx\n", (unsigned long)proc_list_head_addr);
+	
+    struct proc *proc_list, *target_proc = NULL;
+    if (kvm_read(kd, proc_list_head_addr, &proc_list, sizeof(proc_list)) != sizeof(proc_list)) {
+        fprintf(stderr, "read PROC_LIST_ADDR error: %s\n", kvm_geterr(kd));
+        kvm_close(kd);
+        return 0;
+    }
+	printf("struct proc list: 0x%lx\n",proc_list);
 
     struct proc curr_proc;
-	struct proc *p = 0;
-    for (p = proc_list; p != NULL; p = (struct proc *)(curr_proc.p_list.le_next)) {
-        if (kvm_read(kd, (vaddr_t)p, &curr_proc, sizeof(curr_proc)) != sizeof(curr_proc)) {
+	struct proc *p = proc_list;
+	int seq = 0;
+	while(p != 0){
+        if (kvm_read(kd, (vaddr_t)p, &curr_proc, sizeof(struct proc)) != sizeof(struct proc)) {
+			fprintf(stderr, "kvm_read struct proc error: %s\n", kvm_geterr(kd));
             break;
         }
-        if (curr_proc.p_pid == target_pid) {
+		
+		pid_t pid = *(pid_t*)((char*)&curr_proc + 120);
+        if (curr_proc.p_pid == target_pid ) {
             target_proc = p;
-            break;
+			fprintf(stderr, "find target struct proc:0x%x,number:%d\n",p ,seq);
+            //break;
         }
+
+		seq ++;
+		p = (struct proc *)(curr_proc.p_list.le_next);
+		fprintf(stderr, "number:%d,pid:%d,address:0x%p\n",seq,curr_proc.p_pid ,p );
     }
 
     if (target_proc == NULL) {
-        fprintf(stderr, "PID=%d error\n", target_pid);
+        fprintf(stderr, "can not get struct proc of PID:%d\n", target_pid);
         kvm_close(kd);
-        return 1;
+        return 0;
     }
-
-
+	
     struct vmspace vmspace;
-    if (kvm_read(kd, (vaddr_t)curr_proc.p_vmspace, &vmspace, sizeof(vmspace)) != sizeof(vmspace)) {
-        fprintf(stderr, "kvm_read failed: %s\n", kvm_geterr(kd));
+    if (kvm_read(kd, (vaddr_t)curr_proc.p_vmspace, &vmspace, sizeof(struct vmspace)) != sizeof(struct vmspace)) {
+        fprintf(stderr, "kvm_read p_vmspace failed: %s\n", kvm_geterr(kd));
         kvm_close(kd);
-        return 1;
+        return 0;
     }
-
-/*
-    struct vm_map vmap;
-    if (kvm_read(kd, (unsigned long)&vmspace.vm_map, (void*)&vmap, sizeof(vmap)) != sizeof(vmap)) {
-        fprintf(stderr, "read vm_map error: %s\n", kvm_geterr(kd));
-        kvm_close(kd);
-        return 1;
-    }
-	*/
-
-/*
+	
+	/*
     struct vm_map_entry entry;
     struct vm_map_entry *curr_entry = vmap.entries;
     int writable = 0;
@@ -490,37 +655,46 @@ int writeProcesData(pid_t target_pid, char *vaddr,char * value) {
         }
         curr_entry = entry.next;
     }
-
-    if (!writable) {
-        fprintf(stderr, "address:0x%lx can not be written\n", target_vaddr);
-        kvm_close(kd);
-        return 1;
-    }
 	*/
 
+	printf("sizoef(kcondvar_t):0x%x,sizeof(krwlock_t):0x%x,sizeof(kmutex_t):0x%x,sizeof(struct vmspace):0x%x,sizeof(struct vm_map):0x%x,sizeof(struct rb_tree):0x%x,sizeof(vsize_t):0x%x,sizeof(struct vm_map_entry):0x%x\r\n",sizeof(kcondvar_t),sizeof(krwlock_t),sizeof(kmutex_t),sizeof(struct vmspace),sizeof(struct vm_map),sizeof(struct rb_tree),sizeof(vsize_t),sizeof(struct vm_map_entry));
+
+	fprintf(stderr, "vmspace address:0x%x\n", curr_proc.p_vmspace);
+	
+	data = (char*)&vmspace;
+
+	for ( i = 0;i < sizeof(struct vmspace);i += 4){
+		//printf("%d\t%08x\r\n", i,*(unsigned int*)(data+i));
+	}
+
+	//struct user * myuser = kvm_getu(kd,target_proc);
+	char * mydata = malloc(0x10000);
+	//ssize_t readbytes = kvm_uread(kd, 0xbbbe4000, mydata, 0x1000);
+	//myFile(mydata,0x1000);
+	//printf("kvm_uread result:%d\r\n",readbytes);
+	for(i = 0;i < 256;i++){
+		//printf("%02x ",mydata[i]);
+	}
+	
 	struct pmap *pmap =vmspace.vm_map.pmap;
-	fprintf(stderr, "pmap:%x\n", pmap);
 	
+	//getchar();
+	
+	fprintf(stderr, "vmspace.vm_map.pmap address:0x%x\n", pmap);
+	
+	data = (char*)&vmspace.vm_map;
 
+	for ( i = 0;i < sizeof(struct vm_map);i += 4){
+		//printf("%d\t%08x\r\n", i,*(unsigned int*)(data+i));
+	}
+	//getchar();
 	
-	char * data = "mytest value\r\n";
-    paddr_t phys_addr = virt_to_phys(kd, pmap, data);
+    paddr_t phys_addr = RWPageTable(kd, pmap, tag,end,replace);
     if (phys_addr == 0) {
-        fprintf(stderr, "virt_to_phys error\n");
+        fprintf(stderr, "RWPageTable error\n");
         kvm_close(kd);
-        return 1;
+        return 0;
     }
-
-
-    ssize_t nwritten = kvm_read(kd, phys_addr, &new_value, sizeof(new_value));
-    if (nwritten != sizeof(new_value)) {
-        fprintf(stderr, "kvm_write error: %s\n", kvm_geterr(kd));
-        kvm_close(kd);
-        return 1;
-    }
-
-    printf("kvm_read process:%d address：0x%lx（physical address:0x%lx） value:0x%lx\r\n",
-           target_pid, target_vaddr, phys_addr, new_value);
 
     kvm_close(kd);
     return 0;
