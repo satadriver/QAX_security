@@ -1,0 +1,18 @@
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+    // 修正点：去掉了所有的 0x 前缀，保留纯十六进制字符和连字符
+    uuid(253DAC9E-E710-4929-A1CC-76AF096DB154), 
+    version(1.0),
+    helpstring("MyRpcInterface 1.0")
+]
+interface statistics
+{
+    // 测试函数：无参数，无返回值
+    // 用于测试连通性，如果服务端有此函数或兼容占位，即可通过
+	int StatisticsFunction0();
+    int StatisticsFunction1(int  a1,int * a2);
+	int StatisticsFunction2(int  a1,int  a2);
+	int StatisticsFunction3(int  a1,int  a2);
+}

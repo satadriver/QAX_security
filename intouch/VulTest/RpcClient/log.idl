@@ -1,0 +1,18 @@
+import "oaidl.idl";
+import "ocidl.idl";
+
+[
+    // 修正点：去掉了所有的 0x 前缀，保留纯十六进制字符和连字符
+    uuid(4e0c90df-e39d-4164-a421-ace89484c602), 
+    version(1.0),
+    helpstring("MyRpcInterface 1.0")
+]
+interface intouch
+{
+    // 测试函数：无参数，无返回值
+    // 用于测试连通性，如果服务端有此函数或兼容占位，即可通过
+	int IntouchFunction0();
+    int IntouchFunction1(int  a1,int * a2);
+	int IntouchFunction2(int  a1,int  a2);
+	int IntouchFunction3(int  a1,int  a2);
+}
