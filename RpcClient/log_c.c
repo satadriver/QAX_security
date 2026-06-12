@@ -1,0 +1,603 @@
+
+
+/* this ALWAYS GENERATED file contains the RPC client stubs */
+
+
+ /* File created by MIDL compiler version 8.01.0628 */
+/* at Tue Jan 19 11:14:07 2038
+ */
+/* Compiler settings for intouch.idl:
+    Oicf, W1, Zp8, env=Win32 (32b run), target_arch=X86 8.01.0628 
+    protocol : dce , ms_ext, c_ext, robust
+    error checks: allocation ref bounds_check enum stub_data 
+    VC __declspec() decoration level: 
+         __declspec(uuid()), __declspec(selectany), __declspec(novtable)
+         DECLSPEC_UUID(), MIDL_INTERFACE()
+*/
+/* @@MIDL_FILE_HEADING(  ) */
+
+#if !defined(_M_IA64) && !defined(_M_AMD64) && !defined(_ARM_)
+
+
+#pragma warning( disable: 4049 )  /* more than 64k source lines */
+#if _MSC_VER >= 1200
+#pragma warning(push)
+#endif
+
+#pragma warning( disable: 4211 )  /* redefine extern to static */
+#pragma warning( disable: 4232 )  /* dllimport identity*/
+#pragma warning( disable: 4024 )  /* array to pointer mapping*/
+#pragma warning( disable: 4100 ) /* unreferenced arguments in x86 call */
+
+#pragma optimize("", off ) 
+
+#include <string.h>
+
+#include "log.h"
+
+#define TYPE_FORMAT_STRING_SIZE   7                                 
+#define PROC_FORMAT_STRING_SIZE   173                               
+#define EXPR_FORMAT_STRING_SIZE   1                                 
+#define TRANSMIT_AS_TABLE_SIZE    0            
+#define WIRE_MARSHAL_TABLE_SIZE   0            
+
+typedef struct _intouch_MIDL_TYPE_FORMAT_STRING
+    {
+    short          Pad;
+    unsigned char  Format[ TYPE_FORMAT_STRING_SIZE ];
+    } intouch_MIDL_TYPE_FORMAT_STRING;
+
+typedef struct _intouch_MIDL_PROC_FORMAT_STRING
+    {
+    short          Pad;
+    unsigned char  Format[ PROC_FORMAT_STRING_SIZE ];
+    } intouch_MIDL_PROC_FORMAT_STRING;
+
+typedef struct _intouch_MIDL_EXPR_FORMAT_STRING
+    {
+    long          Pad;
+    unsigned char  Format[ EXPR_FORMAT_STRING_SIZE ];
+    } intouch_MIDL_EXPR_FORMAT_STRING;
+
+
+static const RPC_SYNTAX_IDENTIFIER  _RpcTransferSyntax_2_0 = 
+{{0x8A885D04,0x1CEB,0x11C9,{0x9F,0xE8,0x08,0x00,0x2B,0x10,0x48,0x60}},{2,0}};
+
+#if defined(_CONTROL_FLOW_GUARD_XFG)
+#define XFG_TRAMPOLINES(ObjectType)\
+NDR_SHAREABLE unsigned long ObjectType ## _UserSize_XFG(unsigned long * pFlags, unsigned long Offset, void * pObject)\
+{\
+return  ObjectType ## _UserSize(pFlags, Offset, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE unsigned char * ObjectType ## _UserMarshal_XFG(unsigned long * pFlags, unsigned char * pBuffer, void * pObject)\
+{\
+return ObjectType ## _UserMarshal(pFlags, pBuffer, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE unsigned char * ObjectType ## _UserUnmarshal_XFG(unsigned long * pFlags, unsigned char * pBuffer, void * pObject)\
+{\
+return ObjectType ## _UserUnmarshal(pFlags, pBuffer, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE void ObjectType ## _UserFree_XFG(unsigned long * pFlags, void * pObject)\
+{\
+ObjectType ## _UserFree(pFlags, (ObjectType *)pObject);\
+}
+#define XFG_TRAMPOLINES64(ObjectType)\
+NDR_SHAREABLE unsigned long ObjectType ## _UserSize64_XFG(unsigned long * pFlags, unsigned long Offset, void * pObject)\
+{\
+return  ObjectType ## _UserSize64(pFlags, Offset, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE unsigned char * ObjectType ## _UserMarshal64_XFG(unsigned long * pFlags, unsigned char * pBuffer, void * pObject)\
+{\
+return ObjectType ## _UserMarshal64(pFlags, pBuffer, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE unsigned char * ObjectType ## _UserUnmarshal64_XFG(unsigned long * pFlags, unsigned char * pBuffer, void * pObject)\
+{\
+return ObjectType ## _UserUnmarshal64(pFlags, pBuffer, (ObjectType *)pObject);\
+}\
+NDR_SHAREABLE void ObjectType ## _UserFree64_XFG(unsigned long * pFlags, void * pObject)\
+{\
+ObjectType ## _UserFree64(pFlags, (ObjectType *)pObject);\
+}
+#define XFG_BIND_TRAMPOLINES(HandleType, ObjectType)\
+static void* ObjectType ## _bind_XFG(HandleType pObject)\
+{\
+return ObjectType ## _bind((ObjectType) pObject);\
+}\
+static void ObjectType ## _unbind_XFG(HandleType pObject, handle_t ServerHandle)\
+{\
+ObjectType ## _unbind((ObjectType) pObject, ServerHandle);\
+}
+#define XFG_TRAMPOLINE_FPTR(Function) Function ## _XFG
+#define XFG_TRAMPOLINE_FPTR_DEPENDENT_SYMBOL(Symbol) Symbol ## _XFG
+#else
+#define XFG_TRAMPOLINES(ObjectType)
+#define XFG_TRAMPOLINES64(ObjectType)
+#define XFG_BIND_TRAMPOLINES(HandleType, ObjectType)
+#define XFG_TRAMPOLINE_FPTR(Function) Function
+#define XFG_TRAMPOLINE_FPTR_DEPENDENT_SYMBOL(Symbol) Symbol
+#endif
+
+
+extern const intouch_MIDL_TYPE_FORMAT_STRING intouch__MIDL_TypeFormatString;
+extern const intouch_MIDL_PROC_FORMAT_STRING intouch__MIDL_ProcFormatString;
+extern const intouch_MIDL_EXPR_FORMAT_STRING intouch__MIDL_ExprFormatString;
+
+#define GENERIC_BINDING_TABLE_SIZE   0            
+
+
+/* Standard interface: intouch, ver. 1.0,
+   GUID={0x4e0c90df,0xe39d,0x4164,{0xa4,0x21,0xac,0xe8,0x94,0x84,0xc6,0x02}} */
+
+
+
+static const RPC_CLIENT_INTERFACE intouch___RpcClientInterface =
+    {
+    sizeof(RPC_CLIENT_INTERFACE),
+    {{0x4e0c90df,0xe39d,0x4164,{0xa4,0x21,0xac,0xe8,0x94,0x84,0xc6,0x02}},{1,0}},
+    {{0x8A885D04,0x1CEB,0x11C9,{0x9F,0xE8,0x08,0x00,0x2B,0x10,0x48,0x60}},{2,0}},
+    0,
+    0,
+    0,
+    0,
+    0,
+    0x00000000
+    };
+RPC_IF_HANDLE intouch_v1_0_c_ifspec = (RPC_IF_HANDLE)& intouch___RpcClientInterface;
+#ifdef __cplusplus
+namespace {
+#endif
+
+extern const MIDL_STUB_DESC intouch_StubDesc;
+extern const MIDL_STUB_DESC intouch_StubDesc2;
+extern const MIDL_STUB_DESC intouch_StubDesc3;
+#ifdef __cplusplus
+}
+#endif
+
+static RPC_BINDING_HANDLE intouch__MIDL_AutoBindHandle;
+
+__declspec(align(16))  unsigned char g_My_Format[34] = {
+0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x38, 0x00, 0x40, 0x01, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x01, 0x04, 0x00,
+0x06, 0x00
+};
+
+int LogFunction0( DWORD *p)
+{
+    CLIENT_CALL_RETURN _RetVal;
+
+    _RetVal = NdrClientCall2( ( PMIDL_STUB_DESC  )&intouch_StubDesc,g_My_Format,p);
+    return ( int  )_RetVal.Simple;
+    
+}
+
+
+
+unsigned char g_My_Format2[34] = {
+    0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x1C, 0x00, 0x30, 0x40, 0x00, 0x00, 0x00, 0x00,
+    0x44, 0x00, 0x08, 0x00, 0x46, 0x05, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00,
+    0x00, 0x00
+};
+
+int LogFunction1( char* a1,int* a2)
+{
+    CLIENT_CALL_RETURN _RetVal;
+    /*
+    __asm {
+        mov ecx,a2
+        push a1
+        lea eax, g_My_Format2
+        push eax
+        lea eax, intouch_StubDesc2
+        push eax
+		call NdrClientCall2
+        mov _RetVal,eax
+        mov _RetVal,edx
+    }
+    */
+    _RetVal = NdrClientCall2(( PMIDL_STUB_DESC  )&intouch_StubDesc2,g_My_Format2,a1, a2 );
+    return ( int  )_RetVal.Simple;
+    
+}
+unsigned char g_My_Format3[64] = {
+    0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x0C, 0x00, 0x30, 0x40, 0x00, 0x00, 0x00, 0x00,
+    0x24, 0x00, 0x2C, 0x00, 0x44, 0x03, 0x08, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00,
+    0x00, 0x00, 0x12, 0x00, 0x50, 0x21, 0x04, 0x00, 0x0B, 0x00, 0x70, 0x00, 0x08, 0x00, 0x08, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x04, 0x02, 0x00, 0x30, 0xA0, 0x00, 0x00, 0x00, 0x00
+};
+
+int LogFunction2( int * a1,int* a2)
+{
+
+    CLIENT_CALL_RETURN _RetVal;
+
+    _RetVal = NdrClientCall2(
+                  ( PMIDL_STUB_DESC  )&intouch_StubDesc3,
+                  (PFORMAT_STRING)g_My_Format3,
+                  a1,a2);
+    return ( int  )_RetVal.Simple;
+    
+}
+
+
+int IntouchFunction3( 
+    /* [in] */ handle_t IDL_handle,
+    int a1,
+    int a2)
+{
+
+    CLIENT_CALL_RETURN _RetVal;
+
+    _RetVal = NdrClientCall2(
+                  ( PMIDL_STUB_DESC  )&intouch_StubDesc,
+                  (PFORMAT_STRING) &intouch__MIDL_ProcFormatString.Format[126],
+                  ( unsigned char * )&IDL_handle);
+    return ( int  )_RetVal.Simple;
+    
+}
+
+
+#if !defined(__RPC_WIN32__)
+#error  Invalid build platform for this stub.
+#endif
+
+#if !(TARGET_IS_NT50_OR_LATER)
+#error You need Windows 2000 or later to run this stub because it uses these features:
+#error   /robust command line switch.
+#error However, your C/C++ compilation flags indicate you intend to run this app on earlier systems.
+#error This app will fail with the RPC_X_WRONG_STUB_VERSION error.
+#endif
+
+
+static const intouch_MIDL_PROC_FORMAT_STRING intouch__MIDL_ProcFormatString =
+    {
+        0,
+        {
+
+	/* Procedure IntouchFunction0 */
+
+			0x0,		/* 0 */
+			0x48,		/* Old Flags:  */
+/*  2 */	NdrFcLong( 0x0 ),	/* 0 */
+/*  6 */	NdrFcShort( 0x0 ),	/* 0 */
+/*  8 */	NdrFcShort( 0x8 ),	/* x86 Stack size/offset = 8 */
+/* 10 */	0x32,		/* FC_BIND_PRIMITIVE */
+			0x0,		/* 0 */
+/* 12 */	NdrFcShort( 0x0 ),	/* x86 Stack size/offset = 0 */
+/* 14 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 16 */	NdrFcShort( 0x8 ),	/* 8 */
+/* 18 */	0x44,		/* Oi2 Flags:  has return, has ext, */
+			0x1,		/* 1 */
+/* 20 */	0x8,		/* 8 */
+			0x1,		/* Ext Flags:  new corr desc, */
+/* 22 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 24 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 26 */	NdrFcShort( 0x0 ),	/* 0 */
+
+	/* Return value */
+
+/* 28 */	NdrFcShort( 0x70 ),	/* Flags:  out, return, base type, */
+/* 30 */	NdrFcShort( 0x4 ),	/* x86 Stack size/offset = 4 */
+/* 32 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Procedure IntouchFunction1 */
+
+/* 34 */	0x0,		/* 0 */
+			0x48,		/* Old Flags:  */
+/* 36 */	NdrFcLong( 0x0 ),	/* 0 */
+/* 40 */	NdrFcShort( 0x1 ),	/* 1 */
+/* 42 */	NdrFcShort( 0x10 ),	/* x86 Stack size/offset = 16 */
+/* 44 */	0x32,		/* FC_BIND_PRIMITIVE */
+			0x0,		/* 0 */
+/* 46 */	NdrFcShort( 0x0 ),	/* x86 Stack size/offset = 0 */
+/* 48 */	NdrFcShort( 0x24 ),	/* 36 */
+/* 50 */	NdrFcShort( 0x8 ),	/* 8 */
+/* 52 */	0x44,		/* Oi2 Flags:  has return, has ext, */
+			0x3,		/* 3 */
+/* 54 */	0x8,		/* 8 */
+			0x1,		/* Ext Flags:  new corr desc, */
+/* 56 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 58 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 60 */	NdrFcShort( 0x0 ),	/* 0 */
+
+	/* Parameter a1 */
+
+/* 62 */	NdrFcShort( 0x48 ),	/* Flags:  in, base type, */
+/* 64 */	NdrFcShort( 0x4 ),	/* x86 Stack size/offset = 4 */
+/* 66 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Parameter a2 */
+
+/* 68 */	NdrFcShort( 0x148 ),	/* Flags:  in, base type, simple ref, */
+/* 70 */	NdrFcShort( 0x8 ),	/* x86 Stack size/offset = 8 */
+/* 72 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Return value */
+
+/* 74 */	NdrFcShort( 0x70 ),	/* Flags:  out, return, base type, */
+/* 76 */	NdrFcShort( 0xc ),	/* x86 Stack size/offset = 12 */
+/* 78 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Procedure IntouchFunction2 */
+
+/* 80 */	0x0,		/* 0 */
+			0x48,		/* Old Flags:  */
+/* 82 */	NdrFcLong( 0x0 ),	/* 0 */
+/* 86 */	NdrFcShort( 0x2 ),	/* 2 */
+/* 88 */	NdrFcShort( 0x10 ),	/* x86 Stack size/offset = 16 */
+/* 90 */	0x32,		/* FC_BIND_PRIMITIVE */
+			0x0,		/* 0 */
+/* 92 */	NdrFcShort( 0x0 ),	/* x86 Stack size/offset = 0 */
+/* 94 */	NdrFcShort( 0x10 ),	/* 16 */
+/* 96 */	NdrFcShort( 0x8 ),	/* 8 */
+/* 98 */	0x44,		/* Oi2 Flags:  has return, has ext, */
+			0x3,		/* 3 */
+/* 100 */	0x8,		/* 8 */
+			0x1,		/* Ext Flags:  new corr desc, */
+/* 102 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 104 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 106 */	NdrFcShort( 0x0 ),	/* 0 */
+
+	/* Parameter a1 */
+
+/* 108 */	NdrFcShort( 0x48 ),	/* Flags:  in, base type, */
+/* 110 */	NdrFcShort( 0x4 ),	/* x86 Stack size/offset = 4 */
+/* 112 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Parameter a2 */
+
+/* 114 */	NdrFcShort( 0x48 ),	/* Flags:  in, base type, */
+/* 116 */	NdrFcShort( 0x8 ),	/* x86 Stack size/offset = 8 */
+/* 118 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Return value */
+
+/* 120 */	NdrFcShort( 0x70 ),	/* Flags:  out, return, base type, */
+/* 122 */	NdrFcShort( 0xc ),	/* x86 Stack size/offset = 12 */
+/* 124 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Procedure IntouchFunction3 */
+
+/* 126 */	0x0,		/* 0 */
+			0x48,		/* Old Flags:  */
+/* 128 */	NdrFcLong( 0x0 ),	/* 0 */
+/* 132 */	NdrFcShort( 0x3 ),	/* 3 */
+/* 134 */	NdrFcShort( 0x10 ),	/* x86 Stack size/offset = 16 */
+/* 136 */	0x32,		/* FC_BIND_PRIMITIVE */
+			0x0,		/* 0 */
+/* 138 */	NdrFcShort( 0x0 ),	/* x86 Stack size/offset = 0 */
+/* 140 */	NdrFcShort( 0x10 ),	/* 16 */
+/* 142 */	NdrFcShort( 0x8 ),	/* 8 */
+/* 144 */	0x44,		/* Oi2 Flags:  has return, has ext, */
+			0x3,		/* 3 */
+/* 146 */	0x8,		/* 8 */
+			0x1,		/* Ext Flags:  new corr desc, */
+/* 148 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 150 */	NdrFcShort( 0x0 ),	/* 0 */
+/* 152 */	NdrFcShort( 0x0 ),	/* 0 */
+
+	/* Parameter a1 */
+
+/* 154 */	NdrFcShort( 0x48 ),	/* Flags:  in, base type, */
+/* 156 */	NdrFcShort( 0x4 ),	/* x86 Stack size/offset = 4 */
+/* 158 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Parameter a2 */
+
+/* 160 */	NdrFcShort( 0x48 ),	/* Flags:  in, base type, */
+/* 162 */	NdrFcShort( 0x8 ),	/* x86 Stack size/offset = 8 */
+/* 164 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+	/* Return value */
+
+/* 166 */	NdrFcShort( 0x70 ),	/* Flags:  out, return, base type, */
+/* 168 */	NdrFcShort( 0xc ),	/* x86 Stack size/offset = 12 */
+/* 170 */	0x8,		/* FC_LONG */
+			0x0,		/* 0 */
+
+			0x0
+        }
+    };
+
+static const intouch_MIDL_TYPE_FORMAT_STRING intouch__MIDL_TypeFormatString =
+    {
+        0,
+        {
+			NdrFcShort( 0x0 ),	/* 0 */
+/*  2 */	
+			0x11, 0x8,	/* FC_RP [simple_pointer] */
+/*  4 */	0x8,		/* FC_LONG */
+			0x5c,		/* FC_PAD */
+
+			0x0
+        }
+    };
+
+static const unsigned short intouch_FormatStringOffsetTable[] =
+    {
+    0,
+    34,
+    80,
+    126
+    };
+
+
+#ifdef __cplusplus
+namespace {
+#endif
+
+
+
+    //RPC_CLIENT_INTERFACE
+    __declspec(align(16))  const unsigned char g_My_RpcClientInterface[68] = {
+    0x44, 0x00, 0x00, 0x00,
+
+    0xDF, 0x90, 0x0C, 0x4E, 0x9D, 0xE3, 0x64, 0x41, 0xA4, 0x21, 0xAC, 0xE8,0x94, 0x84, 0xC6, 0x02,
+    0x01, 0x00, 0x00, 0x00,
+
+    0x04, 0x5D, 0x88, 0x8A, 0xEB, 0x1C, 0xC9, 0x11,0x9F, 0xE8, 0x08, 0x00, 0x2B, 0x10, 0x48, 0x60,
+    0x02, 0x00, 0x00, 0x00,
+
+    0x00, 0x00, 0x00, 0x00,
+
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00,
+
+    };
+
+
+
+
+    __declspec(align(16))  const unsigned char g_My_pFormatTypes[50] = {
+       0x00, 0x00, 0x11, 0x04, 0x02, 0x00, 0x30, 0xA0, 0x00, 0x00, 0x11, 0x04, 0x02, 0x00, 0x30, 0xE1,
+       0x00, 0x00, 0x30, 0x41, 0x00, 0x00, 0x11, 0x08, 0x25, 0x5C, 0x11, 0x14, 0x02, 0x00, 0x12, 0x08,
+       0x25, 0x5C, 0x11, 0x0C, 0x08, 0x5C, 0x11, 0x0C, 0x0B, 0x5C, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+       0x00, 0x00
+    };
+
+
+    __declspec(align(16))  const static const MIDL_STUB_DESC intouch_StubDesc =
+    {
+        //(void *)& intouch___RpcClientInterface,
+        g_My_RpcClientInterface,       // [0] RpcInterfaceInformation
+        MIDL_user_allocate,
+        MIDL_user_free,
+        &intouch__MIDL_AutoBindHandle,  // [3] FormatStringOffset (NDR 格式字符串)
+        0,      // [4] apfnNdrRundownRoutines
+        0,// [5] aGenericBindingRoutinePairs
+        0,  //[6]aGenericBindingRoutinePairs
+        0,  //[7]apfnExprEval
+        //intouch__MIDL_TypeFormatString.Format,
+        g_My_pFormatTypes,    // [8] pFormatTypes
+        1,  //[9] fCheckBounds /* -error bounds_check flag */
+        0x50002, //10 /* Ndr library version */
+        0,      //11 pMallocFreeStruct
+        0x0700022B,//0x8010274, /* MIDL Version 8.1.628 */
+        0,      //13 CommFaultOffsets
+        0,      //14 aUserMarshalQuadruple
+        0,  //15 NotifyRoutineTable /* notify & notify_flag routine table */
+        0x1,//16 /* MIDL flag */
+        0,  //17 /* cs routines */
+        0,   //18 /* proxy/server info */
+        0   //19 pExprInfo
+    };
+
+
+    unsigned char g_My_RpcClientInterface2[72] = {
+    0x44, 0x00, 0x00, 0x00, 0xD9, 0x64, 0x70, 0x2E, 0x16, 0x1C, 0x79, 0x4D, 0xBF, 0x70, 0xFF, 0x99,
+    0xBE, 0x73, 0xA8, 0x7F, 0x01, 0x00, 0x00, 0x00, 0x04, 0x5D, 0x88, 0x8A, 0xEB, 0x1C, 0xC9, 0x11,
+    0x9F, 0xE8, 0x08, 0x00, 0x2B, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+
+    RPC_BINDING_HANDLE intouch__MIDL_AutoBindHandle2;
+
+    __declspec(align(16))  const static const MIDL_STUB_DESC intouch_StubDesc2 =
+    {
+        //(void *)& intouch___RpcClientInterface,
+        g_My_RpcClientInterface2,       // [0] RpcInterfaceInformation
+        MIDL_user_allocate,
+        MIDL_user_free,
+        &intouch__MIDL_AutoBindHandle2,  // [3] FormatStringOffset (NDR 格式字符串)
+        0,      // [4] apfnNdrRundownRoutines
+        0,// [5] aGenericBindingRoutinePairs
+        0,  //[6]aGenericBindingRoutinePairs
+        0,  //[7]apfnExprEval
+        //intouch__MIDL_TypeFormatString.Format,
+        g_My_pFormatTypes,    // [8] pFormatTypes
+        1,  //[9] fCheckBounds /* -error bounds_check flag */
+        0x50002, //10 /* Ndr library version */
+        0,      //11 pMallocFreeStruct
+        0x0700022B,//0x8010274, /* MIDL Version 8.1.628 */
+        0,      //13 CommFaultOffsets
+        0,      //14 aUserMarshalQuadruple
+        0,  //15 NotifyRoutineTable /* notify & notify_flag routine table */
+        0x1,//16 /* MIDL flag */
+        0,  //17 /* cs routines */
+        0,   //18 /* proxy/server info */
+        0   //19 pExprInfo
+    };
+
+    RPC_BINDING_HANDLE intouch__MIDL_AutoBindHandle3;
+
+
+    unsigned char g_My_RpcClientInterface3[68] = {
+    0x44, 0x00, 0x00, 0x00, 0x13, 0xF7, 0xDB, 0xCB, 0x39, 0x73, 0xD9, 0x4B, 0xBF, 0xC2, 0x74, 0x38,
+    0x21, 0x08, 0x83, 0xCD, 0x01, 0x00, 0x00, 0x00, 0x04, 0x5D, 0x88, 0x8A, 0xEB, 0x1C, 0xC9, 0x11,
+    0x9F, 0xE8, 0x08, 0x00, 0x2B, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00
+    };
+
+    __declspec(align(16))  const static const MIDL_STUB_DESC intouch_StubDesc3 =
+    {
+        //(void *)& intouch___RpcClientInterface,
+        g_My_RpcClientInterface3,       // [0] RpcInterfaceInformation
+        MIDL_user_allocate,
+        MIDL_user_free,
+        &intouch__MIDL_AutoBindHandle3,  // [3] FormatStringOffset (NDR 格式字符串)
+        0,      // [4] apfnNdrRundownRoutines
+        0,// [5] aGenericBindingRoutinePairs
+        0,  //[6]aGenericBindingRoutinePairs
+        0,  //[7]apfnExprEval
+        //intouch__MIDL_TypeFormatString.Format,
+        g_My_pFormatTypes,    // [8] pFormatTypes
+        1,  //[9] fCheckBounds /* -error bounds_check flag */
+        0x50002, //10 /* Ndr library version */
+        0,      //11 pMallocFreeStruct
+        0x0700022B,//0x8010274, /* MIDL Version 8.1.628 */
+        0,      //13 CommFaultOffsets
+        0,      //14 aUserMarshalQuadruple
+        0,  //15 NotifyRoutineTable /* notify & notify_flag routine table */
+        0x1,//16 /* MIDL flag */
+        0,  //17 /* cs routines */
+        0,   //18 /* proxy/server info */
+        0   //19 pExprInfo
+    };
+
+static const MIDL_STUB_DESC intouch_StubDesc_old = 
+    {
+    (void *)& intouch___RpcClientInterface,
+    MIDL_user_allocate,
+    MIDL_user_free,
+    &intouch__MIDL_AutoBindHandle,
+    0,
+    0,
+    0,
+    0,
+    intouch__MIDL_TypeFormatString.Format,
+    1, /* -error bounds_check flag */
+    0x50002, /* Ndr library version */
+    0,
+    0x8010274, /* MIDL Version 8.1.628 */
+    0,
+    0,
+    0,  /* notify & notify_flag routine table */
+    0x1, /* MIDL flag */
+    0, /* cs routines */
+    0,   /* proxy/server info */
+    0
+    };
+#ifdef __cplusplus
+}
+#endif
+#if _MSC_VER >= 1200
+#pragma warning(pop)
+#endif
+
+
+#endif /* !defined(_M_IA64) && !defined(_M_AMD64) && !defined(_ARM_) */
+

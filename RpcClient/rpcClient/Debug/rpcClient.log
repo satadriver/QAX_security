@@ -1,0 +1,37 @@
+﻿  FileHelper.cpp
+  LogClient.cpp
+  LogFlagEditor.cpp
+  LoggerDll.cpp
+  pe.cpp
+D:\Project\VulTest\RpcClient\rpcClient\pe.cpp(199,7): warning C4101: “szout”: 未引用的局部变量
+  rpcClient.cpp
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(26,29): warning C4018: “<”: 有符号/无符号不匹配
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,11): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,11): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,17): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,17): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,29): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,29): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,41): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,41): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,53): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,53): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,77): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,77): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,83): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,83): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,95): warning C4838: 从“int”转换到“const char”需要收缩转换
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(68,95): warning C4309: “初始化”: 截断常量值
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(111,12): warning C4477: “printf”: 格式字符串“%ws”需要类型“wchar_t *”的参数，但可变参数 1 拥有了类型“RPC_WSTR”
+D:\Project\VulTest\RpcClient\rpcClient\rpcClient.cpp(130,16): warning C4477: “printf”: 格式字符串“%ws”需要类型“wchar_t *”的参数，但可变参数 1 拥有了类型“RPC_WSTR”
+  正在生成代码...
+  log_c.c
+D:\Project\VulTest\RpcClient\log_c.c(471,41): warning C4114: 多次使用同一类型限定符
+D:\Project\VulTest\RpcClient\log_c.c(474,9): warning C4090: “初始化”: 不同的“const”限定符
+D:\Project\VulTest\RpcClient\log_c.c(508,41): warning C4114: 多次使用同一类型限定符
+D:\Project\VulTest\RpcClient\log_c.c(545,41): warning C4114: 多次使用同一类型限定符
+  mgr_c.c
+  obj_c.c
+  statistics_c.c
+  正在生成代码...
+  rpcClient.vcxproj -> D:\Project\VulTest\Debug\rpcClient.exe
