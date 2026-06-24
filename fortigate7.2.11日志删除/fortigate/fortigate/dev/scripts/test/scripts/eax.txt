@@ -1,2 +1,0 @@
-execute log filter device 0
-exit
